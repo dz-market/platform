@@ -1,0 +1,4 @@
+duration: ${DURATION}
+
+nested:
+    string: ${STRING}
