@@ -1,6 +1,7 @@
 package health
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"slices"
@@ -8,7 +9,17 @@ import (
 	"time"
 )
 
+const (
+	defaultPeriod  = 5 * time.Second
+	defaultTimeout = 2 * time.Second
+)
+
 type Probe func(ctx context.Context) error
+
+type Options struct {
+	Period  time.Duration
+	Timeout time.Duration
+}
 
 type check struct {
 	name  string
@@ -17,6 +28,7 @@ type check struct {
 }
 
 type Checker struct {
+	period  time.Duration
 	timeout time.Duration
 	log     *slog.Logger
 
@@ -25,9 +37,10 @@ type Checker struct {
 	healthy bool
 }
 
-func New(log *slog.Logger, timeout time.Duration) *Checker {
+func New(opts Options, log *slog.Logger) *Checker {
 	return &Checker{
-		timeout: timeout,
+		period:  cmp.Or(opts.Period, defaultPeriod),
+		timeout: cmp.Or(opts.Timeout, defaultTimeout),
 		log:     log,
 		healthy: true,
 	}
@@ -40,8 +53,8 @@ func (c *Checker) Register(name string, probe Probe) {
 	c.checks = append(c.checks, &check{name: name, probe: probe, up: true})
 }
 
-func (c *Checker) Run(ctx context.Context, period time.Duration, onChange func(healthy bool)) error {
-	ticker := time.NewTicker(period)
+func (c *Checker) Run(ctx context.Context, onChange func(healthy bool)) error {
+	ticker := time.NewTicker(c.period)
 	defer ticker.Stop()
 
 	c.evaluate(ctx, onChange)
@@ -73,37 +86,15 @@ func (c *Checker) evaluate(ctx context.Context, onChange func(bool)) {
 
 	for _, check := range checks {
 		err := c.probe(ctx, check.probe)
-		up := err == nil
+		if ctx.Err() != nil {
+			return
+		}
 
-		if !up {
+		if err != nil {
 			healthy = false
 		}
 
-		if up == check.up {
-			c.log.DebugContext(
-				ctx, "health check completed",
-				slog.String("dependency", check.name),
-			)
-
-			continue
-		}
-
-		check.up = up
-
-		if up {
-			c.log.InfoContext(
-				ctx, "dependency restored",
-				slog.String("dependency", check.name),
-			)
-
-			continue
-		}
-
-		c.log.ErrorContext(
-			ctx, "dependency unavailable",
-			slog.String("dependency", check.name),
-			slog.Any("err", err),
-		)
+		c.record(ctx, check, err)
 	}
 
 	c.mu.Lock()
@@ -114,6 +105,36 @@ func (c *Checker) evaluate(ctx context.Context, onChange func(bool)) {
 	if changed {
 		onChange(healthy)
 	}
+}
+
+func (c *Checker) record(ctx context.Context, check *check, err error) {
+	up := err == nil
+
+	if up == check.up {
+		c.log.DebugContext(
+			ctx, "health check completed",
+			slog.String("dependency", check.name),
+		)
+
+		return
+	}
+
+	check.up = up
+
+	if up {
+		c.log.InfoContext(
+			ctx, "dependency restored",
+			slog.String("dependency", check.name),
+		)
+
+		return
+	}
+
+	c.log.ErrorContext(
+		ctx, "dependency unavailable",
+		slog.String("dependency", check.name),
+		slog.Any("err", err),
+	)
 }
 
 func (c *Checker) probe(ctx context.Context, probe Probe) error {
