@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const defaultConnectTimeout = 5 * time.Second
 
 type Options struct {
 	AppName           string
@@ -36,10 +39,6 @@ func New(ctx context.Context, opts Options, log *slog.Logger) (*DB, error) {
 
 	applyOptions(cfg, opts)
 
-	if opts.PingTimeout > 0 {
-		cfg.PingTimeout = opts.PingTimeout
-	}
-
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open pool: %w", err)
@@ -50,7 +49,7 @@ func New(ctx context.Context, opts Options, log *slog.Logger) (*DB, error) {
 		log:  log,
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, opts.ConnectTimeout)
+	pingCtx, cancel := context.WithTimeout(ctx, cfg.ConnConfig.ConnectTimeout)
 	defer cancel()
 
 	if err := db.Ping(pingCtx); err != nil {
@@ -98,11 +97,15 @@ func (d *DB) Close() {
 }
 
 func applyOptions(cfg *pgxpool.Config, opts Options) {
-	cfg.ConnConfig.RuntimeParams["application_name"] = opts.AppName
-
-	if opts.ConnectTimeout > 0 {
-		cfg.ConnConfig.ConnectTimeout = opts.ConnectTimeout
+	if opts.AppName != "" {
+		cfg.ConnConfig.RuntimeParams["application_name"] = opts.AppName
 	}
+
+	if opts.PingTimeout > 0 {
+		cfg.PingTimeout = opts.PingTimeout
+	}
+
+	cfg.ConnConfig.ConnectTimeout = cmp.Or(opts.ConnectTimeout, cfg.ConnConfig.ConnectTimeout, defaultConnectTimeout)
 
 	if opts.MaxConns > 0 {
 		cfg.MaxConns = opts.MaxConns
