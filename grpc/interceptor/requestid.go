@@ -13,13 +13,12 @@ import (
 
 const HeaderRequestID = "x-request-id"
 
-type requestIDKey struct{}
+const maxRequestIDLen = 128
 
 func RequestID() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		id := incomingRequestID(ctx)
 
-		ctx = context.WithValue(ctx, requestIDKey{}, id)
 		ctx = logger.With(ctx, slog.String("request_id", id))
 
 		_ = grpc.SetHeader(ctx, metadata.Pairs(HeaderRequestID, id))
@@ -30,7 +29,7 @@ func RequestID() grpc.UnaryServerInterceptor {
 
 func incomingRequestID(ctx context.Context) string {
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if values := md.Get(HeaderRequestID); len(values) > 0 && values[0] != "" {
+		if values := md.Get(HeaderRequestID); len(values) > 0 && values[0] != "" && len(values[0]) <= maxRequestIDLen {
 			return values[0]
 		}
 	}
