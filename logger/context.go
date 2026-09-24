@@ -17,6 +17,28 @@ func With(ctx context.Context, attrs ...slog.Attr) context.Context {
 	return context.WithValue(ctx, attrsKey{}, all)
 }
 
+type contextHandler struct {
+	slog.Handler
+}
+
+func ContextHandler(h slog.Handler) slog.Handler {
+	return contextHandler{h}
+}
+
+func (h contextHandler) Handle(ctx context.Context, r slog.Record) error {
+	r.AddAttrs(attrsFrom(ctx)...)
+
+	return h.Handler.Handle(ctx, r)
+}
+
+func (h contextHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return contextHandler{h.Handler.WithAttrs(attrs)}
+}
+
+func (h contextHandler) WithGroup(name string) slog.Handler {
+	return contextHandler{h.Handler.WithGroup(name)}
+}
+
 func attrsFrom(ctx context.Context) []slog.Attr {
 	attrs, ok := ctx.Value(attrsKey{}).([]slog.Attr)
 	if !ok {
@@ -24,14 +46,4 @@ func attrsFrom(ctx context.Context) []slog.Attr {
 	}
 
 	return attrs
-}
-
-type contextHandler struct {
-	slog.Handler
-}
-
-func (h contextHandler) Handle(ctx context.Context, r slog.Record) error {
-	r.AddAttrs(attrsFrom(ctx)...)
-
-	return h.Handler.Handle(ctx, r)
 }
