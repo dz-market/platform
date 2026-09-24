@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -17,43 +18,54 @@ import (
 	"github.com/dz-market/platform/grpc/interceptor"
 )
 
+const defaultShutdownTimeout = 5 * time.Second
+
 type Options struct {
 	Addr                  string
 	Reflection            bool
 	MaxRecvMsgSize        int
 	MaxConnectionAge      time.Duration
 	MaxConnectionAgeGrace time.Duration
-	Validator             protovalidate.Validator
-	Interceptors          []grpc.UnaryServerInterceptor
+	ShutdownTimeout       time.Duration
+
+	Validator protovalidate.Validator
+
+	Unary []grpc.UnaryServerInterceptor
 }
 
 type Server struct {
-	grpc   *grpc.Server
-	health *health.Server
-	addr   string
-	log    *slog.Logger
+	grpc            *grpc.Server
+	health          *health.Server
+	addr            string
+	shutdownTimeout time.Duration
+	log             *slog.Logger
 }
 
 func New(opts Options, log *slog.Logger) *Server {
-	chain := append(
-		[]grpc.UnaryServerInterceptor{
-			interceptor.Recovery(log),
-			interceptor.RequestID(),
-			interceptor.Logging(log),
-			interceptor.Validate(opts.Validator),
-		}, opts.Interceptors...,
+	unary := make([]grpc.UnaryServerInterceptor, 0, len(opts.Unary)+4)
+	unary = append(
+		unary, interceptor.RequestID(),
+		interceptor.Logging(log),
+		interceptor.Recovery(log),
 	)
+	unary = append(unary, opts.Unary...)
+	unary = append(unary, interceptor.Validate(opts.Validator))
 
-	srv := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(chain...),
+	serverOpts := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(unary...),
 		grpc.KeepaliveParams(
 			keepalive.ServerParameters{
 				MaxConnectionAge:      opts.MaxConnectionAge,
 				MaxConnectionAgeGrace: opts.MaxConnectionAgeGrace,
 			},
 		),
-		grpc.MaxRecvMsgSize(opts.MaxRecvMsgSize),
-	)
+	}
+
+	if opts.MaxRecvMsgSize > 0 {
+		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(opts.MaxRecvMsgSize))
+	}
+
+	srv := grpc.NewServer(serverOpts...)
 
 	healthSrv := health.NewServer()
 	healthpb.RegisterHealthServer(srv, healthSrv)
@@ -65,14 +77,15 @@ func New(opts Options, log *slog.Logger) *Server {
 	}
 
 	return &Server{
-		grpc:   srv,
-		health: healthSrv,
-		addr:   opts.Addr,
-		log:    log,
+		grpc:            srv,
+		health:          healthSrv,
+		addr:            opts.Addr,
+		shutdownTimeout: cmp.Or(opts.ShutdownTimeout, defaultShutdownTimeout),
+		log:             log,
 	}
 }
 
-func (s *Server) Serve(ctx context.Context) error {
+func (s *Server) Run(ctx context.Context) error {
 	var lc net.ListenConfig
 
 	lis, err := lc.Listen(ctx, "tcp", s.addr)
@@ -80,24 +93,52 @@ func (s *Server) Serve(ctx context.Context) error {
 		return fmt.Errorf("listen %s: %w", s.addr, err)
 	}
 
-	s.health.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
-
-	s.log.InfoContext(
-		ctx, "grpc server listening",
-		slog.String("addr", s.addr),
-	)
-
-	if err := s.grpc.Serve(lis); err != nil {
-		return fmt.Errorf("serve: %w", err)
-	}
-
-	return nil
+	return s.Serve(ctx, lis)
 }
 
-func (s *Server) Shutdown(ctx context.Context, timeout time.Duration) {
-	s.health.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
+func (s *Server) Serve(ctx context.Context, lis net.Listener) error {
+	s.log.InfoContext(
+		ctx, "grpc server listening",
+		slog.String("addr", lis.Addr().String()),
+	)
 
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+	serveErr := make(chan error, 1)
+
+	go func() {
+		serveErr <- s.grpc.Serve(lis)
+	}()
+
+	select {
+	case err := <-serveErr:
+		return fmt.Errorf("serve: %w", err)
+
+	case <-ctx.Done():
+	}
+
+	s.shutdown(ctx)
+
+	return <-serveErr
+}
+
+//nolint:revive // flag-parameter: the signature matched health.Checker's onChange.
+func (s *Server) SetServing(serving bool) {
+	status := healthpb.HealthCheckResponse_NOT_SERVING
+
+	if serving {
+		status = healthpb.HealthCheckResponse_SERVING
+	}
+
+	s.health.SetServingStatus("", status)
+}
+
+func (s *Server) Registrar() grpc.ServiceRegistrar {
+	return s.grpc
+}
+
+func (s *Server) shutdown(ctx context.Context) {
+	s.health.Shutdown()
+
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.shutdownTimeout)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -114,13 +155,10 @@ func (s *Server) Shutdown(ctx context.Context, timeout time.Duration) {
 	case <-ctx.Done():
 		s.log.WarnContext(
 			ctx, "grpc server did not drain in time, forcing stop",
-			slog.Duration("timeout", timeout),
+			slog.Duration("timeout", s.shutdownTimeout),
 		)
 
 		s.grpc.Stop()
+		<-done
 	}
-}
-
-func (s *Server) Registrar() grpc.ServiceRegistrar {
-	return s.grpc
 }
