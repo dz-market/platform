@@ -12,6 +12,5 @@ func Default(log *slog.Logger, validator protovalidate.Validator, inner ...grpc.
 	chain = append(chain, RequestID(), Logging(log), Recovery(log))
 	chain = append(chain, inner...)
 
-
 	return append(chain, Validate(validator))
 }
