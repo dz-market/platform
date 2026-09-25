@@ -58,7 +58,7 @@ func Serve(ctx context.Context, srv *grpc.Server, lis net.Listener, opts ServeOp
 }
 
 func stop(ctx context.Context, srv *grpc.Server, timeout time.Duration, log *slog.Logger) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	defer cancel()
 
 	done := make(chan struct{})
