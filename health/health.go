@@ -42,7 +42,7 @@ func New(opts Options, log *slog.Logger) *Checker {
 		period:  cmp.Or(opts.Period, defaultPeriod),
 		timeout: cmp.Or(opts.Timeout, defaultTimeout),
 		log:     log,
-		healthy: true,
+		healthy: false,
 	}
 }
 
