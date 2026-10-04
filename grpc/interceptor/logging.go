@@ -28,7 +28,10 @@ func slogAdapter(log *slog.Logger) logging.Logger {
 
 func codeToLevel(code codes.Code) logging.Level {
 	switch code {
-	case codes.OK, codes.NotFound, codes.Canceled, codes.AlreadyExists,
+	case codes.OK:
+		return logging.LevelDebug
+
+	case codes.NotFound, codes.Canceled, codes.AlreadyExists,
 		codes.InvalidArgument, codes.Unauthenticated:
 		return logging.LevelInfo
 
