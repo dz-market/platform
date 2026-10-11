@@ -27,11 +27,11 @@ func noLookup(string) (string, bool) {
 	return "", false
 }
 
-func withEnv(lookup lookupFunc) Option {
-	return WithResolver(schemeEnv, envResolver(lookup))
+func withEnv(env Env) Option {
+	return WithResolver(schemeEnv, envResolver(env))
 }
 
-func lookupFrom(vars map[string]string) lookupFunc {
+func lookupFrom(vars map[string]string) Env {
 	return func(name string) (string, bool) {
 		v, ok := vars[name]
 

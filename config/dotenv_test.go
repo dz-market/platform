@@ -24,9 +24,9 @@ func TestEnvLookupPrecedence(t *testing.T) {
 	t.Setenv("ONLY_ENV", "env")
 	t.Setenv("BOTH", "env")
 
-	lookup, err := envLookup(path)
+	env, err := LoadEnv(path)
 	if err != nil {
-		t.Fatalf("envLookup: %v", err)
+		t.Fatalf("LoadEnv: %v", err)
 	}
 
 	tests := []struct {
@@ -44,7 +44,7 @@ func TestEnvLookupPrecedence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
-				got, ok := lookup(tt.key)
+				got, ok := env(tt.key)
 				if got != tt.want || ok != tt.wantOK {
 					t.Errorf("lookup(%q) = (%q, %v), want (%q, %v)", tt.key, got, ok, tt.want, tt.wantOK)
 				}
@@ -56,12 +56,12 @@ func TestEnvLookupPrecedence(t *testing.T) {
 func TestEnvLookupMissingFileIsNotAnError(t *testing.T) {
 	t.Parallel()
 
-	lookup, err := envLookup(filepath.Join(t.TempDir(), "absent"))
+	env, err := LoadEnv(filepath.Join(t.TempDir(), "absent"))
 	if err != nil {
-		t.Fatalf("envLookup: %v", err)
+		t.Fatalf("LoadEnv: %v", err)
 	}
 
-	if _, ok := lookup("ANYTHING"); ok {
+	if _, ok := env("ANYTHING"); ok {
 		t.Error("lookup found a value with no .env file")
 	}
 }
@@ -69,8 +69,8 @@ func TestEnvLookupMissingFileIsNotAnError(t *testing.T) {
 func TestEnvLookupUnreadableFile(t *testing.T) {
 	t.Parallel()
 
-	if _, err := envLookup(t.TempDir()); err == nil {
-		t.Error("envLookup on a directory: want error, got nil")
+	if _, err := LoadEnv(t.TempDir()); err == nil {
+		t.Error("LoadEnv on a directory: want error, got nil")
 	}
 }
 

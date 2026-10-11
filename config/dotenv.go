@@ -12,10 +12,12 @@ import (
 
 const schemeEnv = "env"
 
-func envLookup(envPath string) (lookupFunc, error) {
-	vars, err := godotenv.Read(envPath)
+type Env func(name string) (string, bool)
+
+func LoadEnv(path string) (Env, error) {
+	vars, err := godotenv.Read(path)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("read %s: %w", envPath, err)
+		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
 
 	return func(name string) (string, bool) {
@@ -29,14 +31,14 @@ func envLookup(envPath string) (lookupFunc, error) {
 	}, nil
 }
 
-func envResolver(lookup lookupFunc) Resolver {
+func envResolver(env Env) Resolver {
 	return ResolverFunc(
 		func(_ context.Context, name string) (string, error) {
 			if name == "" {
 				return "", fmt.Errorf("%w: empty variable name", ErrInvalidReference)
 			}
 
-			if v, ok := lookup(name); ok {
+			if v, ok := env(name); ok {
 				return v, nil
 			}
 
