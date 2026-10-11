@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"path/filepath"
@@ -26,6 +27,10 @@ func noLookup(string) (string, bool) {
 	return "", false
 }
 
+func withEnv(lookup lookupFunc) Option {
+	return WithResolver(schemeEnv, envResolver(lookup))
+}
+
 func lookupFrom(vars map[string]string) lookupFunc {
 	return func(name string) (string, bool) {
 		v, ok := vars[name]
@@ -41,7 +46,7 @@ func testdataFile(name string) Option {
 func TestLoadAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
-	got, err := load[testConfig](testdataFile("valid.yml"), withLookup(noLookup))
+	got, err := load[testConfig](t.Context(), testdataFile("valid.yml"), withEnv(noLookup))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -74,7 +79,7 @@ func TestLoadPrefersLookupOverDefaults(t *testing.T) {
 		},
 	)
 
-	got, err := load[testConfig](testdataFile("valid.yml"), withLookup(lookup))
+	got, err := load[testConfig](t.Context(), testdataFile("valid.yml"), withEnv(lookup))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -102,14 +107,12 @@ func TestLoadErrors(t *testing.T) {
 		file    string
 		wantErr error
 	}{
-		{name: "no such file", file: "absent.yml", wantErr: ErrRead},
-		{name: "malformed yaml", file: "broken.yml", wantErr: ErrParse},
-		{name: "unknown key", file: "unknown.yml", wantErr: ErrDecode},
-		{
-			name:    "unresolved references",
-			file:    "unresolved.yml",
-			wantErr: ErrUnresolved,
-		},
+		{name: "no such file", file: "absent.yml", wantErr: ErrReadFile},
+		{name: "malformed yaml", file: "broken.yml", wantErr: ErrParseYAML},
+		{name: "unknown key", file: "unknown.yml", wantErr: ErrDecodeConfig},
+		{name: "missing references", file: "unresolved.yml", wantErr: ErrMissingReference},
+		{name: "missing scheme", file: "noscheme.yml", wantErr: ErrInvalidReference},
+		{name: "unknown scheme", file: "unknown_scheme.yml", wantErr: ErrInvalidReference},
 	}
 
 	for _, tt := range tests {
@@ -117,7 +120,7 @@ func TestLoadErrors(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				_, err := load[testConfig](testdataFile(tt.file), withLookup(noLookup))
+				_, err := load[testConfig](t.Context(), testdataFile(tt.file), withEnv(noLookup))
 				if !errors.Is(err, tt.wantErr) {
 					t.Errorf("load() error = %v, want %v", err, tt.wantErr)
 				}
@@ -129,9 +132,15 @@ func TestLoadErrors(t *testing.T) {
 func TestLoadReportsMissingReferences(t *testing.T) {
 	t.Parallel()
 
-	_, err := load[testConfig](testdataFile("unresolved.yml"), withLookup(noLookup))
-	if !strings.Contains(err.Error(), "DURATION, STRING") {
-		t.Errorf("load() error = %q, want it to list the missing names", err)
+	_, err := load[testConfig](t.Context(), testdataFile("unresolved.yml"), withEnv(noLookup))
+	if err == nil {
+		t.Fatal("load() error = nil, want missing references")
+	}
+
+	for _, ref := range []string{"${env:DURATION}", "${env:STRING}"} {
+		if !strings.Contains(err.Error(), ref) {
+			t.Errorf("load() error = %q, want it to mention %s", err, ref)
+		}
 	}
 }
 
@@ -140,7 +149,7 @@ func TestLoadReadsEnvFile(t *testing.T) {
 
 	path := writeEnv(t, "STRING=from-file")
 
-	got, err := load[testConfig](testdataFile("valid.yml"), WithEnvPath(path))
+	got, err := load[testConfig](t.Context(), testdataFile("valid.yml"), WithEnvPath(path))
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -153,8 +162,53 @@ func TestLoadReadsEnvFile(t *testing.T) {
 func TestLoadValidates(t *testing.T) {
 	t.Parallel()
 
-	_, err := Load[validatable](testdataFile("empty.yml"), withLookup(noLookup))
-	if !errors.Is(err, ErrValidate) {
-		t.Errorf("Load() error = %v, want %v", err, ErrValidate)
+	_, err := Load[validatable](t.Context(), testdataFile("empty.yml"), withEnv(noLookup))
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("Load() error = %v, want %v", err, ErrValidation)
+	}
+}
+
+func TestLoadUsesRegisteredResolver(t *testing.T) {
+	t.Parallel()
+
+	var gotRef string
+
+	resolver := ResolverFunc(
+		func(_ context.Context, ref string) (string, error) {
+			gotRef = ref
+
+			return "line1\nline2", nil
+		},
+	)
+
+	got, err := load[testConfig](t.Context(), testdataFile("custom.yml"), WithResolver("custom", resolver))
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if gotRef != "key" {
+		t.Errorf("resolver got ref %q, want %q", gotRef, "key")
+	}
+
+	if got.Nested.String != "line1\nline2" {
+		t.Errorf("Nested.String = %q, want %q", got.Nested.String, "line1\nline2")
+	}
+}
+
+func TestLoadPassesContext(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	resolver := ResolverFunc(
+		func(ctx context.Context, _ string) (string, error) {
+			return "", ctx.Err()
+		},
+	)
+
+	_, err := load[testConfig](ctx, testdataFile("custom.yml"), WithResolver("custom", resolver))
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("load() error = %v, want %v", err, context.Canceled)
 	}
 }

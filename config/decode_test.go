@@ -59,8 +59,8 @@ func TestDecodeRejects(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				if _, err := decode[testConfig](tt.tree); !errors.Is(err, ErrDecode) {
-					t.Errorf("decode() error = %v, want %v", err, ErrDecode)
+				if _, err := decode[testConfig](tt.tree); !errors.Is(err, ErrDecodeConfig) {
+					t.Errorf("decode() error = %v, want %v", err, ErrDecodeConfig)
 				}
 			},
 		)

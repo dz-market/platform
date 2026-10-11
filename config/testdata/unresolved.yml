@@ -1,4 +1,4 @@
-duration: ${DURATION}
+duration: ${env:DURATION}
 
 nested:
-    string: ${STRING}
+    string: ${env:STRING}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,5 +71,53 @@ func TestEnvLookupUnreadableFile(t *testing.T) {
 
 	if _, err := envLookup(t.TempDir()); err == nil {
 		t.Error("envLookup on a directory: want error, got nil")
+	}
+}
+
+func TestEnvResolver(t *testing.T) {
+	t.Parallel()
+
+	r := envResolver(
+		lookupFrom(
+			map[string]string{
+				"SET":   "value",
+				"EMPTY": "",
+			},
+		),
+	)
+
+	tests := []struct {
+		name    string
+		ref     string
+		want    string
+		wantErr error
+	}{
+		{name: "set", ref: "SET", want: "value"},
+		{name: "set to empty", ref: "EMPTY", want: ""},
+		{name: "default applied", ref: "UNSET:-fallback", want: "fallback"},
+		{name: "default ignored when set", ref: "SET:-fallback", want: "value"},
+		{name: "default ignored when set to empty", ref: "EMPTY:-fallback", want: ""},
+		{name: "empty default", ref: "UNSET:-", want: ""},
+		{name: "default with colon", ref: "UNSET:-a:b", want: "a:b"},
+		{name: "not found", ref: "UNSET", wantErr: ErrNotFound},
+		{name: "empty name", ref: "", wantErr: ErrInvalidReference},
+		{name: "empty name with default", ref: ":-x", wantErr: ErrInvalidReference},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				got, err := r.Resolve(t.Context(), tt.ref)
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Resolve(%q) error = %v, want %v", tt.ref, err, tt.wantErr)
+				}
+
+				if got != tt.want {
+					t.Errorf("Resolve(%q) = %q, want %q", tt.ref, got, tt.want)
+				}
+			},
+		)
 	}
 }

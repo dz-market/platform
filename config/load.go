@@ -1,10 +1,10 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"slices"
-	"strings"
+	"regexp"
 
 	"github.com/goccy/go-yaml"
 )
@@ -14,6 +14,8 @@ const (
 	defaultEnvPath    = ".env"
 )
 
+var schemePattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+
 type lookupFunc func(string) (string, bool)
 
 type Option func(*loader)
@@ -21,7 +23,8 @@ type Option func(*loader)
 type loader struct {
 	configPath string
 	envPath    string
-	lookup     lookupFunc
+	resolvers  map[string]Resolver
+	err        error
 }
 
 func WithPath(path string) Option {
@@ -36,63 +39,70 @@ func WithEnvPath(envPath string) Option {
 	}
 }
 
-func withLookup(fn lookupFunc) Option {
+func WithResolver(scheme string, r Resolver) Option {
 	return func(l *loader) {
-		l.lookup = fn
+		if !schemePattern.MatchString(scheme) {
+			l.err = fmt.Errorf("resolver scheme %q: must match %s", scheme, schemePattern)
+
+			return
+		}
+
+		l.resolvers[scheme] = r
 	}
 }
 
-func Load[T any](opts ...Option) (cfg T, err error) {
-	cfg, err = load[T](opts...)
+func Load[T any](ctx context.Context, opts ...Option) (cfg T, err error) {
+	cfg, err = load[T](ctx, opts...)
 	if err != nil {
 		return cfg, err
 	}
 
 	if err := validate(cfg); err != nil {
-		return cfg, fmt.Errorf("%w: %w", ErrValidate, err)
+		return cfg, fmt.Errorf("%w: %w", ErrValidation, err)
 	}
 
 	return cfg, nil
 }
 
-func load[T any](opts ...Option) (cfg T, err error) {
+func load[T any](ctx context.Context, opts ...Option) (cfg T, err error) {
 	l := loader{
 		configPath: defaultConfigPath,
 		envPath:    defaultEnvPath,
+		resolvers:  make(map[string]Resolver),
 	}
 
 	for _, opt := range opts {
 		opt(&l)
 	}
 
-	if l.lookup == nil {
+	if l.err != nil {
+		return cfg, l.err
+	}
+
+	if _, ok := l.resolvers[schemeEnv]; !ok {
 		lookup, err := envLookup(l.envPath)
 		if err != nil {
 			return cfg, fmt.Errorf("load env: %w", err)
 		}
 
-		l.lookup = lookup
+		l.resolvers[schemeEnv] = envResolver(lookup)
 	}
 
 	raw, err := os.ReadFile(l.configPath)
 	if err != nil {
-		return cfg, fmt.Errorf("%w: %w", ErrRead, err)
+		return cfg, fmt.Errorf("%w: %w", ErrReadFile, err)
 	}
 
 	var tree map[string]any
 	if err := yaml.Unmarshal(raw, &tree); err != nil {
-		return cfg, fmt.Errorf("%w: %w", ErrParse, err)
+		return cfg, fmt.Errorf("%w: %w", ErrParseYAML, err)
 	}
 
-	var missing []string
+	e := newExpander(l.resolvers)
+	e.node(ctx, tree)
 
-	expandNode(tree, l.lookup, &missing)
-
-	if len(missing) > 0 {
-		slices.Sort(missing)
-		missing = slices.Compact(missing)
-
-		return cfg, fmt.Errorf("%w: %s", ErrUnresolved, strings.Join(missing, ", "))
+	if err := e.err(); err != nil {
+		return cfg, err
 	}
 
 	return decode[T](tree)

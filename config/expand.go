@@ -1,27 +1,51 @@
 package config
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 )
 
 var refPattern = regexp.MustCompile(`\$\$|\$\{[^{}]*\}`)
 
-func expandNode(node any, lookup lookupFunc, missing *[]string) any {
+type result struct {
+	value string
+	err   error
+}
+
+type expander struct {
+	resolvers map[string]Resolver
+	cache     map[string]result
+	errs      map[string]error
+}
+
+func newExpander(resolvers map[string]Resolver) *expander {
+	return &expander{
+		resolvers: resolvers,
+		cache:     make(map[string]result),
+		errs:      make(map[string]error),
+	}
+}
+
+func (e *expander) node(ctx context.Context, node any) any {
 	switch v := node.(type) {
 	case string:
-		return expand(v, lookup, missing)
+		return e.string(ctx, v)
 
 	case map[string]any:
 		for key, child := range v {
-			v[key] = expandNode(child, lookup, missing)
+			v[key] = e.node(ctx, child)
 		}
 
 		return v
 
 	case []any:
 		for i, child := range v {
-			v[i] = expandNode(child, lookup, missing)
+			v[i] = e.node(ctx, child)
 		}
 
 		return v
@@ -31,32 +55,71 @@ func expandNode(node any, lookup lookupFunc, missing *[]string) any {
 	}
 }
 
-func expand(s string, lookup lookupFunc, missing *[]string) string {
+func (e *expander) string(ctx context.Context, s string) string {
 	return refPattern.ReplaceAllStringFunc(
 		s, func(match string) string {
 			if match == "$$" {
 				return "$"
 			}
 
-			name, def, hasDefault := strings.Cut(match[2:len(match)-1], ":-")
-
-			if name == "" {
-				*missing = append(*missing, match)
-
-				return ""
-			}
-
-			if val, ok := lookup(name); ok {
-				return val
-			}
-
-			if hasDefault {
-				return def
-			}
-
-			*missing = append(*missing, name)
-
-			return ""
+			return e.ref(ctx, match)
 		},
 	)
+}
+
+func (e *expander) ref(ctx context.Context, match string) string {
+	inner := match[2 : len(match)-1]
+
+	scheme, ref, ok := strings.Cut(inner, ":")
+	if !ok || scheme == "" {
+		e.errs[match] = fmt.Errorf("%w: %s: missing scheme, use ${%s:%s}", ErrInvalidReference, match, schemeEnv, inner)
+
+		return ""
+	}
+
+	r, ok := e.resolvers[scheme]
+	if !ok {
+		e.errs[match] = fmt.Errorf("%w: %s: unknown scheme %q", ErrInvalidReference, match, scheme)
+
+		return ""
+	}
+
+	res, ok := e.cache[inner]
+	if !ok {
+		value, err := r.Resolve(ctx, ref)
+		res = result{
+			value: value,
+			err:   err,
+		}
+		e.cache[inner] = res
+	}
+
+	switch {
+	case res.err == nil:
+		return res.value
+
+	case errors.Is(res.err, ErrNotFound):
+		e.errs[match] = fmt.Errorf("%w: %s", ErrMissingReference, match)
+
+	case errors.Is(res.err, ErrInvalidReference):
+		e.errs[match] = fmt.Errorf(
+			"%w: %s: %s",
+			ErrInvalidReference, match, strings.TrimPrefix(res.err.Error(), ErrInvalidReference.Error()+": "),
+		)
+
+	default:
+		e.errs[match] = fmt.Errorf("%w: %s: %w", ErrResolverFailed, match, res.err)
+	}
+
+	return ""
+}
+
+func (e *expander) err() error {
+	errs := slices.SortedFunc(
+		maps.Values(e.errs), func(a, b error) int {
+			return strings.Compare(a.Error(), b.Error())
+		},
+	)
+
+	return errors.Join(errs...)
 }
