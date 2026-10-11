@@ -1,13 +1,17 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
+
+const schemeEnv = "env"
 
 func envLookup(envPath string) (lookupFunc, error) {
 	vars, err := godotenv.Read(envPath)
@@ -24,4 +28,26 @@ func envLookup(envPath string) (lookupFunc, error) {
 
 		return v, ok
 	}, nil
+}
+
+func envResolver(lookup lookupFunc) Resolver {
+	return ResolverFunc(
+		func(_ context.Context, ref string) (string, error) {
+			name, def, hasDefault := strings.Cut(ref, ":-")
+
+			if name == "" {
+				return "", fmt.Errorf("%w: empty variable name", ErrInvalidReference)
+			}
+
+			if v, ok := lookup(name); ok {
+				return v, nil
+			}
+
+			if hasDefault {
+				return def, nil
+			}
+
+			return "", ErrNotFound
+		},
+	)
 }

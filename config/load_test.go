@@ -102,13 +102,13 @@ func TestLoadErrors(t *testing.T) {
 		file    string
 		wantErr error
 	}{
-		{name: "no such file", file: "absent.yml", wantErr: ErrRead},
-		{name: "malformed yaml", file: "broken.yml", wantErr: ErrParse},
-		{name: "unknown key", file: "unknown.yml", wantErr: ErrDecode},
+		{name: "no such file", file: "absent.yml", wantErr: ErrReadFile},
+		{name: "malformed yaml", file: "broken.yml", wantErr: ErrParseYAML},
+		{name: "unknown key", file: "unknown.yml", wantErr: ErrDecodeConfig},
 		{
 			name:    "unresolved references",
 			file:    "unresolved.yml",
-			wantErr: ErrUnresolved,
+			wantErr: ErrResolverFailed,
 		},
 	}
 
@@ -154,7 +154,7 @@ func TestLoadValidates(t *testing.T) {
 	t.Parallel()
 
 	_, err := Load[validatable](testdataFile("empty.yml"), withLookup(noLookup))
-	if !errors.Is(err, ErrValidate) {
-		t.Errorf("Load() error = %v, want %v", err, ErrValidate)
+	if !errors.Is(err, ErrValidation) {
+		t.Errorf("Load() error = %v, want %v", err, ErrValidation)
 	}
 }

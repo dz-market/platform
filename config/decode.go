@@ -24,7 +24,7 @@ func decode[T any](tree map[string]any) (cfg T, err error) {
 	}
 
 	if err := dec.Decode(tree); err != nil {
-		return cfg, fmt.Errorf("%w: %w", ErrDecode, err)
+		return cfg, fmt.Errorf("%w: %w", ErrDecodeConfig, err)
 	}
 
 	return cfg, nil

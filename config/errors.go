@@ -3,9 +3,14 @@ package config
 import "errors"
 
 var (
-	ErrRead       = errors.New("read config")
-	ErrParse      = errors.New("parse config")
-	ErrDecode     = errors.New("decode config")
-	ErrValidate   = errors.New("validate config")
-	ErrUnresolved = errors.New("unresolved references")
+	ErrReadFile     = errors.New("read config file")
+	ErrParseYAML    = errors.New("parse config yaml")
+	ErrDecodeConfig = errors.New("decode config")
+	ErrValidation   = errors.New("validate config")
+
+	ErrMissingReference = errors.New("missing reference")
+	ErrResolverFailed   = errors.New("resolver failed")
+	ErrInvalidReference = errors.New("invalid reference")
+
+	ErrNotFound = errors.New("not found")
 )
