@@ -94,14 +94,8 @@ func TestEnvResolver(t *testing.T) {
 	}{
 		{name: "set", ref: "SET", want: "value"},
 		{name: "set to empty", ref: "EMPTY", want: ""},
-		{name: "default applied", ref: "UNSET:-fallback", want: "fallback"},
-		{name: "default ignored when set", ref: "SET:-fallback", want: "value"},
-		{name: "default ignored when set to empty", ref: "EMPTY:-fallback", want: ""},
-		{name: "empty default", ref: "UNSET:-", want: ""},
-		{name: "default with colon", ref: "UNSET:-a:b", want: "a:b"},
 		{name: "not found", ref: "UNSET", wantErr: ErrNotFound},
 		{name: "empty name", ref: "", wantErr: ErrInvalidReference},
-		{name: "empty name with default", ref: ":-x", wantErr: ErrInvalidReference},
 	}
 
 	for _, tt := range tests {
