@@ -16,8 +16,6 @@ const (
 
 var schemePattern = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 
-type lookupFunc func(string) (string, bool)
-
 type Option func(*loader)
 
 type loader struct {
@@ -80,12 +78,12 @@ func load[T any](ctx context.Context, opts ...Option) (cfg T, err error) {
 	}
 
 	if _, ok := l.resolvers[schemeEnv]; !ok {
-		lookup, err := envLookup(l.envPath)
+		env, err := LoadEnv(l.envPath)
 		if err != nil {
 			return cfg, fmt.Errorf("load env: %w", err)
 		}
 
-		l.resolvers[schemeEnv] = envResolver(lookup)
+		l.resolvers[schemeEnv] = envResolver(env)
 	}
 
 	raw, err := os.ReadFile(l.configPath)
