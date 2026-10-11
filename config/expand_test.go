@@ -1,8 +1,9 @@
 package config
 
 import (
+	"context"
+	"errors"
 	"reflect"
-	"slices"
 	"testing"
 )
 
@@ -15,27 +16,34 @@ func testLookup(name string) (string, bool) {
 	return v, ok
 }
 
-func TestExpand(t *testing.T) {
+func newTestExpander() *expander {
+	return newExpander(
+		map[string]Resolver{
+			schemeEnv: envResolver(testLookup),
+		},
+	)
+}
+
+func TestExpanderString(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		in          string
-		want        string
-		wantMissing []string
+		name    string
+		in      string
+		want    string
+		wantErr error
 	}{
 		{name: "no references", in: "plain text", want: "plain text"},
-		{name: "resolved", in: "${SET}", want: "value"},
-		{name: "resolved to empty value", in: "${EMPTY}", want: ""},
-		{name: "inside text", in: "host=${SET}", want: "host=value"},
-		{name: "repeated", in: "${SET}/${SET}", want: "value/value"},
-		{name: "default applied", in: "${UNSET:-fallback}", want: "fallback"},
-		{name: "default ignored when set", in: "${SET:-fallback}", want: "value"},
-		{name: "empty default", in: "${UNSET:-}", want: ""},
-		{name: "escaped reference", in: "$${SET}", want: "${SET}"},
-		{name: "unresolved", in: "${UNSET}", wantMissing: []string{"UNSET"}},
-		{name: "empty name", in: "${}", wantMissing: []string{"${}"}},
-		{name: "several unresolved", in: "${A}${B}", wantMissing: []string{"A", "B"}},
+		{name: "resolved", in: "${env:SET}", want: "value"},
+		{name: "resolved to empty value", in: "${env:EMPTY}", want: ""},
+		{name: "inside text", in: "host=${env:SET}", want: "host=value"},
+		{name: "repeated", in: "${env:SET}/${env:SET}", want: "value/value"},
+		{name: "escaped reference", in: "$${env:SET}", want: "${env:SET}"},
+		{name: "missing scheme", in: "${SET}", wantErr: ErrInvalidReference},
+		{name: "unknown scheme", in: "${unknown:key}", wantErr: ErrInvalidReference},
+		{name: "empty reference", in: "${}", wantErr: ErrInvalidReference},
+		{name: "rejected by resolver", in: "${env:}", wantErr: ErrInvalidReference},
+		{name: "missing value", in: "${env:UNSET}", wantErr: ErrMissingReference},
 	}
 
 	for _, tt := range tests {
@@ -43,48 +51,48 @@ func TestExpand(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				var missing []string
+				e := newTestExpander()
 
-				got := expand(tt.in, testLookup, &missing)
-				if got != tt.want {
-					t.Errorf("expand(%q) = %q, want %q", tt.in, got, tt.want)
+				got := e.string(t.Context(), tt.in)
+				if err := e.err(); !errors.Is(err, tt.wantErr) {
+					t.Errorf("string(%q) error = %v, want %v", tt.in, err, tt.wantErr)
 				}
 
-				if !slices.Equal(missing, tt.wantMissing) {
-					t.Errorf("expand(%q) missing = %v, want %v", tt.in, missing, tt.wantMissing)
+				if got != tt.want {
+					t.Errorf("string(%q) = %q, want %q", tt.in, got, tt.want)
 				}
 			},
 		)
 	}
 }
 
-func TestExpandNode(t *testing.T) {
+func TestExpanderNode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		node        any
-		want        any
-		wantMissing []string
+		name    string
+		node    any
+		want    any
+		wantErr error
 	}{
-		{name: "string is expanded", node: "${SET}", want: "value"},
+		{name: "string is expanded", node: "${env:SET}", want: "value"},
 		{name: "number is left alone", node: 10, want: 10},
 		{name: "bool is left alone", node: true, want: true},
 		{
 			name: "map is expanded recursively",
-			node: map[string]any{"key": "${SET}"},
+			node: map[string]any{"key": "${env:SET}"},
 			want: map[string]any{"key": "value"},
 		},
 		{
 			name: "list is expanded element by element",
-			node: []any{"${SET}", "plain"},
+			node: []any{"${env:SET}", "plain"},
 			want: []any{"value", "plain"},
 		},
 		{
-			name:        "unresolved deep inside is collected",
-			node:        map[string]any{"outer": map[string]any{"inner": "${UNSET}"}},
-			want:        map[string]any{"outer": map[string]any{"inner": ""}},
-			wantMissing: []string{"UNSET"},
+			name:    "missing value deep inside is reported",
+			node:    map[string]any{"outer": map[string]any{"inner": "${env:UNSET}"}},
+			want:    map[string]any{"outer": map[string]any{"inner": ""}},
+			wantErr: ErrMissingReference,
 		},
 	}
 
@@ -93,18 +101,66 @@ func TestExpandNode(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				var missing []string
+				e := newTestExpander()
 
-				got := expandNode(tt.node, testLookup, &missing)
-
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("expandNode() = %#v, want %#v", got, tt.want)
+				got := e.node(t.Context(), tt.node)
+				if err := e.err(); !errors.Is(err, tt.wantErr) {
+					t.Fatalf("node() error = %v, want %v", err, tt.wantErr)
 				}
 
-				if !slices.Equal(missing, tt.wantMissing) {
-					t.Errorf("missing = %v, want %v", missing, tt.wantMissing)
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("node() = %#v, want %#v", got, tt.want)
 				}
 			},
 		)
+	}
+}
+
+func TestExpanderCachesResults(t *testing.T) {
+	t.Parallel()
+
+	calls := 0
+	e := newExpander(
+		map[string]Resolver{
+			"count": ResolverFunc(
+				func(context.Context, string) (string, error) {
+					calls++
+
+					return "value", nil
+				},
+			),
+		},
+	)
+
+	e.string(t.Context(), "${count:x}${count:x}")
+
+	if calls != 1 {
+		t.Errorf("resolver calls = %d, want 1", calls)
+	}
+}
+
+func TestExpanderResolverFailure(t *testing.T) {
+	t.Parallel()
+
+	boom := errors.New("boom")
+	e := newExpander(
+		map[string]Resolver{
+			"fail": ResolverFunc(
+				func(context.Context, string) (string, error) {
+					return "", boom
+				},
+			),
+		},
+	)
+
+	e.string(t.Context(), "${fail:x}")
+
+	err := e.err()
+	if !errors.Is(err, ErrResolverFailed) {
+		t.Errorf("err() = %v, want %v", err, ErrResolverFailed)
+	}
+
+	if !errors.Is(err, boom) {
+		t.Errorf("err() = %v, want it to wrap %v", err, boom)
 	}
 }

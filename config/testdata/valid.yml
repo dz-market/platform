@@ -1,7 +1,7 @@
-duration: ${DURATION:-10s}
+duration: ${env:DURATION:-10s}
 
 nested:
-    string: ${STRING:-value}
-    bool: ${BOOL:-false}
-    level: ${LEVEL:-info}
-    list: ["${LIST_ITEM:-a}", "b"]
+    string: ${env:STRING:-value}
+    bool: ${env:BOOL:-false}
+    level: ${env:LEVEL:-info}
+    list: ["${env:LIST_ITEM:-a}", "b"]
