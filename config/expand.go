@@ -70,7 +70,7 @@ func (e *expander) string(ctx context.Context, s string) string {
 func (e *expander) ref(ctx context.Context, match string) string {
 	inner := match[2 : len(match)-1]
 
-	scheme, ref, ok := strings.Cut(inner, ":")
+	scheme, rest, ok := strings.Cut(inner, ":")
 	if !ok || scheme == "" {
 		e.errs[match] = fmt.Errorf("%w: %s: missing scheme, use ${%s:%s}", ErrInvalidReference, match, schemeEnv, inner)
 
@@ -84,19 +84,25 @@ func (e *expander) ref(ctx context.Context, match string) string {
 		return ""
 	}
 
-	res, ok := e.cache[inner]
+	ref, def, hasDefault := strings.Cut(rest, ":-")
+	key := scheme + ":" + ref
+
+	res, ok := e.cache[key]
 	if !ok {
 		value, err := r.Resolve(ctx, ref)
 		res = result{
 			value: value,
 			err:   err,
 		}
-		e.cache[inner] = res
+		e.cache[key] = res
 	}
 
 	switch {
 	case res.err == nil:
 		return res.value
+
+	case errors.Is(res.err, ErrNotFound) && hasDefault:
+		return def
 
 	case errors.Is(res.err, ErrNotFound):
 		e.errs[match] = fmt.Errorf("%w: %s", ErrMissingReference, match)

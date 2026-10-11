@@ -39,10 +39,16 @@ func TestExpanderString(t *testing.T) {
 		{name: "inside text", in: "host=${env:SET}", want: "host=value"},
 		{name: "repeated", in: "${env:SET}/${env:SET}", want: "value/value"},
 		{name: "escaped reference", in: "$${env:SET}", want: "${env:SET}"},
+		{name: "default applied", in: "${env:UNSET:-fallback}", want: "fallback"},
+		{name: "default ignored when set", in: "${env:SET:-fallback}", want: "value"},
+		{name: "default ignored when set to empty", in: "${env:EMPTY:-fallback}", want: ""},
+		{name: "empty default", in: "${env:UNSET:-}", want: ""},
+		{name: "default with colon", in: "${env:UNSET:-a:b}", want: "a:b"},
 		{name: "missing scheme", in: "${SET}", wantErr: ErrInvalidReference},
 		{name: "unknown scheme", in: "${unknown:key}", wantErr: ErrInvalidReference},
 		{name: "empty reference", in: "${}", wantErr: ErrInvalidReference},
 		{name: "rejected by resolver", in: "${env:}", wantErr: ErrInvalidReference},
+		{name: "default does not hide invalid reference", in: "${env::-key}", wantErr: ErrInvalidReference},
 		{name: "missing value", in: "${env:UNSET}", wantErr: ErrMissingReference},
 	}
 
@@ -132,7 +138,7 @@ func TestExpanderCachesResults(t *testing.T) {
 		},
 	)
 
-	e.string(t.Context(), "${count:x}${count:x}")
+	e.string(t.Context(), "${count:x}${count:x:-fallback}")
 
 	if calls != 1 {
 		t.Errorf("resolver calls = %d, want 1", calls)
@@ -153,7 +159,7 @@ func TestExpanderResolverFailure(t *testing.T) {
 		},
 	)
 
-	e.string(t.Context(), "${fail:x}")
+	e.string(t.Context(), "${fail:key:-fallback}")
 
 	err := e.err()
 	if !errors.Is(err, ErrResolverFailed) {
