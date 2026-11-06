@@ -18,4 +18,4 @@ concurrency:
 jobs:
     go:
         name: Go
-        uses: dz-market/.github/.github/workflows/go-ci.yml@main
+        uses: dz-market/github-actions/.github/workflows/go-ci.yml@v1
