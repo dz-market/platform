@@ -6,7 +6,6 @@ updates:
             - /config
             - /database/postgres
             - /grpc
-            - /health
             - /logger
             - /vault
         schedule:

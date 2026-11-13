@@ -24,6 +24,5 @@ jobs:
                 config
                 database/postgres
                 grpc
-                health
                 logger
                 vault

@@ -17,6 +17,5 @@ Shared Go libraries for services.
 - [config](config) - configuration loading, validation and value resolution
 - [database/postgres](database/postgres) - connection pools and transactions
 - [grpc](grpc) - server helpers and interceptors
-- [health](health) - dependency health checks
 - [logger](logger) - structured logging and context attributes
 - [vault](vault) - AppRole authentication and configuration resolution

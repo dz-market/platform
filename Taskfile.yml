@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-    MODULES: '{{.CLI_ARGS | default "config database/postgres grpc health logger vault"}}'
+    MODULES: '{{.CLI_ARGS | default "config database/postgres grpc logger vault"}}'
 
 tasks:
     lint:
