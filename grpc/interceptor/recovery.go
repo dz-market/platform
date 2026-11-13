@@ -11,11 +11,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func Recovery(log *slog.Logger) grpc.UnaryServerInterceptor {
-	return recovery.UnaryServerInterceptor(
+func Recovery(log *slog.Logger, opts ...recovery.Option) grpc.UnaryServerInterceptor {
+	defaults := []recovery.Option{
 		recovery.WithRecoveryHandlerContext(
 			func(ctx context.Context, p any) (err error) {
-				log.ErrorContext(
+				logger := log
+
+				if id := RequestIDFromContext(ctx); id != "" {
+					logger = logger.With(slog.String("request_id", id))
+				}
+
+				logger.ErrorContext(
 					ctx, "panic recovered",
 					slog.Any("panic", p),
 					slog.String("stack", string(debug.Stack())),
@@ -24,5 +30,7 @@ func Recovery(log *slog.Logger) grpc.UnaryServerInterceptor {
 				return status.Error(codes.Internal, "internal error")
 			},
 		),
-	)
+	}
+
+	return recovery.UnaryServerInterceptor(append(defaults, opts...)...)
 }

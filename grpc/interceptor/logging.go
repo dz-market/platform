@@ -9,19 +9,29 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func Logging(log *slog.Logger) grpc.UnaryServerInterceptor {
-	return logging.UnaryServerInterceptor(
-		slogAdapter(log),
+func Logging(log *slog.Logger, opts ...logging.Option) grpc.UnaryServerInterceptor {
+	defaults := []logging.Option{
 		logging.WithLogOnEvents(logging.FinishCall),
 		logging.WithLevels(codeToLevel),
 		logging.WithDisableLoggingFields("protocol", "grpc.component", "grpc.method_type"),
+	}
+
+	return logging.UnaryServerInterceptor(
+		slogAdapter(log),
+		append(defaults, opts...)...,
 	)
 }
 
 func slogAdapter(log *slog.Logger) logging.Logger {
 	return logging.LoggerFunc(
 		func(ctx context.Context, level logging.Level, msg string, fields ...any) {
-			log.Log(ctx, slog.Level(level), msg, fields...)
+			logger := log
+
+			if id := RequestIDFromContext(ctx); id != "" {
+				logger = logger.With(slog.String("request_id", id))
+			}
+
+			logger.Log(ctx, slog.Level(level), msg, fields...)
 		},
 	)
 }
