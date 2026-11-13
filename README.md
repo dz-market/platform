@@ -6,7 +6,7 @@ Shared Go libraries for services.
 
 [![CI](https://github.com/dz-market/platform/actions/workflows/ci.yml/badge.svg)](https://github.com/dz-market/platform/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/dz-market/platform/main)](https://app.codecov.io/gh/dz-market/platform)
-[![Go version](https://img.shields.io/github/go-mod/go-version/dz-market/platform)](go.mod)
+[![Go version](https://img.shields.io/github/go-mod/go-version/dz-market/platform?filename=config%2Fgo.mod)](config/go.mod)
 [![Release](https://img.shields.io/github/v/release/dz-market/platform)](https://github.com/dz-market/platform/releases)
 [![License](https://img.shields.io/github/license/dz-market/platform)](LICENSE)
 
