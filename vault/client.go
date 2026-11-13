@@ -1,27 +1,23 @@
 package vault
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
 	"github.com/hashicorp/vault/api"
-	"github.com/hashicorp/vault/api/auth/approle"
 )
 
 type Config struct {
-	Addr     string
-	RoleID   string
-	SecretID string
+	Addr string
 }
 
 type Client struct {
 	api *api.Client
 }
 
-func New(ctx context.Context, cfg Config) (*Client, error) {
-	if err := cfg.validate(); err != nil {
-		return nil, fmt.Errorf("invalid vault config: %w", err)
+func New(cfg Config) (*Client, error) {
+	if cfg.Addr == "" {
+		return nil, errors.New("vault: addr is required")
 	}
 
 	apiCfg := api.DefaultConfig()
@@ -31,37 +27,10 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 
 	apiCfg.Address = cfg.Addr
 
-	c, err := api.NewClient(apiCfg)
+	client, err := api.NewClient(apiCfg)
 	if err != nil {
 		return nil, fmt.Errorf("create vault client: %w", err)
 	}
 
-	auth, err := approle.NewAppRoleAuth(cfg.RoleID, &approle.SecretID{FromString: cfg.SecretID})
-	if err != nil {
-		return nil, fmt.Errorf("create approle auth: %w", err)
-	}
-
-	if _, err := c.Auth().Login(ctx, auth); err != nil {
-		return nil, fmt.Errorf("approle login: %w", err)
-	}
-
-	return &Client{api: c}, nil
-}
-
-func (c Config) validate() error {
-	var errs []error
-
-	if c.Addr == "" {
-		errs = append(errs, errors.New("addr is required"))
-	}
-
-	if c.RoleID == "" {
-		errs = append(errs, errors.New("role id is required"))
-	}
-
-	if c.SecretID == "" {
-		errs = append(errs, errors.New("secret id is required"))
-	}
-
-	return errors.Join(errs...)
+	return &Client{api: client}, nil
 }
