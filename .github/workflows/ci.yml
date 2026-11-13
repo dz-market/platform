@@ -17,5 +17,18 @@ concurrency:
 
 jobs:
     go:
-        name: Go
+        name: Go (${{ matrix.module }})
+        strategy:
+            fail-fast: false
+            matrix:
+                module:
+                    - config
+                    - database/postgres
+                    - grpc
+                    - health
+                    - logger
+                    - vault
+
         uses: dz-market/github-actions/.github/workflows/go-ci.yml@v1
+        with:
+            working-directory: ${{ matrix.module }}
