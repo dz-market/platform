@@ -2,11 +2,9 @@ module github.com/dz-market/platform/grpc
 
 go 1.27.4
 
-replace github.com/dz-market/platform/logger => ../logger
-
 require (
 	buf.build/go/protovalidate v1.4.0
-	github.com/dz-market/platform/logger v0.0.0-00010101000000-000000000000
+	github.com/dz-market/platform/logger v0.5.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	google.golang.org/grpc v1.85.0
 )
