@@ -2,4 +2,7 @@ package vault
 
 import "errors"
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrPathNotFound = errors.New("path not found")
+	ErrNoData       = errors.New("response contains no data")
+)
