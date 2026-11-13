@@ -7,30 +7,29 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-type Config struct {
-	Addr string
-}
-
 type Client struct {
 	api *api.Client
 }
 
-func New(cfg Config) (*Client, error) {
-	if cfg.Addr == "" {
-		return nil, errors.New("vault: addr is required")
+func New(cfg *api.Config) (*Client, error) {
+	if cfg == nil {
+		return nil, errors.New("config is required")
 	}
 
-	apiCfg := api.DefaultConfig()
-	if apiCfg.Error != nil {
-		return nil, fmt.Errorf("read vault config: %w", apiCfg.Error)
+	if cfg.Error != nil {
+		return nil, fmt.Errorf("configure vault client: %w", cfg.Error)
 	}
 
-	apiCfg.Address = cfg.Addr
+	if cfg.Address == "" {
+		return nil, errors.New("address is required")
+	}
 
-	client, err := api.NewClient(apiCfg)
+	client, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create vault client: %w", err)
 	}
 
-	return &Client{api: client}, nil
+	return &Client{
+		api: client,
+	}, nil
 }
