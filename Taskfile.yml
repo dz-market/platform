@@ -1,22 +1,29 @@
 version: "3"
 
+vars:
+    MODULES: '{{.CLI_ARGS | default "config database/postgres grpc health logger vault"}}'
+
 tasks:
     lint:
-        desc: Run golangci-lint
+        desc: "Run golangci-lint: task lint -- [module] (no args = all)"
         cmds:
-            - golangci-lint run
+            -   for: {var: MODULES}
+                cmd: cd {{.ITEM | shellQuote}} && golangci-lint run
 
     lint:fix:
-        desc: Run golangci-lint with autofix
+        desc: "Run golangci-lint with autofix: task lint:fix -- [module] (no args = all)"
         cmds:
-            - golangci-lint run --fix
+            -   for: {var: MODULES}
+                cmd: cd {{.ITEM | shellQuote}} && golangci-lint run --fix
 
     fmt:
-        desc: Apply formatters
+        desc: "Apply formatters: task fmt -- [module] (no args = all)"
         cmds:
-            - golangci-lint fmt
+            -   for: {var: MODULES}
+                cmd: cd {{.ITEM | shellQuote}} && golangci-lint fmt
 
     fix:
-        desc: Rewrite code that uses outdated Go APIs
+        desc: "Rewrite code that uses outdated Go APIs: task fix -- [module] (no args = all)"
         cmds:
-            - go fix ./...
+            -   for: {var: MODULES}
+                cmd: cd {{.ITEM | shellQuote}} && go fix ./...

@@ -2,7 +2,13 @@ version: 2
 
 updates:
     -   package-ecosystem: gomod
-        directory: /
+        directories:
+            - /config
+            - /database/postgres
+            - /grpc
+            - /health
+            - /logger
+            - /vault
         schedule:
             interval: weekly
 
