@@ -1,0 +1,54 @@
+name: Release module tags
+
+on:
+    push:
+        tags: ["v*.*.*"]
+
+permissions:
+    contents: write
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    tags:
+        name: Tag modules
+        runs-on: ubuntu-latest
+
+        env:
+            RELEASE_TAG: ${{ github.ref_name }}
+            MODULES: >-
+                config
+                database/postgres
+                grpc
+                health
+                logger
+                vault
+
+        steps:
+            -   uses: actions/checkout@v7
+                with:
+                    fetch-depth: 0
+
+            -   name: Create module tags
+                shell: bash
+                run: |
+                    set -euo pipefail
+                    
+                    commit=$(git rev-parse "${RELEASE_TAG}^{commit}")
+                    tags=()
+                    
+                    for module in $MODULES; do
+                      tag="$module/$RELEASE_TAG"
+
+                      if git show-ref --verify --quiet "refs/tags/$tag"; then
+                          test "$(git rev-parse "${tag}^{commit}")" = "$commit"
+                      else
+                          git tag "$tag" "$commit"
+                      fi
+
+                      tags+=("refs/tags/$tag")
+                    done
+                    
+                    git push --atomic origin "${tags[@]}"
