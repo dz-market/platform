@@ -1,6 +1,6 @@
 module github.com/dz-market/platform/database/postgres
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/jackc/pgerrcode v0.0.0-20250907135507-afb5586c32a6

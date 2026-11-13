@@ -1,6 +1,6 @@
 module github.com/dz-market/platform/vault
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/hashicorp/vault/api v1.23.0
