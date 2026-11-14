@@ -2,29 +2,37 @@ package interceptor
 
 import (
 	"context"
-	"log/slog"
 	"uuid"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-
-	"github.com/dz-market/platform/logger"
 )
 
 const HeaderRequestID = "x-request-id"
 
 const maxRequestIDLen = 128
 
+type requestIDKey struct{}
+
 func RequestID() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		id := incomingRequestID(ctx)
 
-		ctx = logger.With(ctx, slog.String("request_id", id))
+		ctx = context.WithValue(ctx, requestIDKey{}, id)
 
 		_ = grpc.SetHeader(ctx, metadata.Pairs(HeaderRequestID, id))
 
 		return handler(ctx, req)
 	}
+}
+
+func RequestIDFromContext(ctx context.Context) string {
+	id, ok := ctx.Value(requestIDKey{}).(string)
+	if !ok {
+		return ""
+	}
+
+	return id
 }
 
 func incomingRequestID(ctx context.Context) string {
