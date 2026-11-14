@@ -10,15 +10,19 @@ import (
 )
 
 func Logging(log *slog.Logger, opts ...logging.Option) grpc.UnaryServerInterceptor {
-	defaults := []logging.Option{
+	options := make([]logging.Option, 0, len(opts)+3)
+
+	options = append(
+		options,
 		logging.WithLogOnEvents(logging.FinishCall),
 		logging.WithLevels(codeToLevel),
 		logging.WithDisableLoggingFields("protocol", "grpc.component", "grpc.method_type"),
-	}
+	)
+	options = append(options, opts...)
 
 	return logging.UnaryServerInterceptor(
 		slogAdapter(log),
-		append(defaults, opts...)...,
+		options...,
 	)
 }
 

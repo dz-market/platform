@@ -12,7 +12,10 @@ import (
 )
 
 func Recovery(log *slog.Logger, opts ...recovery.Option) grpc.UnaryServerInterceptor {
-	defaults := []recovery.Option{
+	options := make([]recovery.Option, 0, len(opts)+1)
+
+	options = append(
+		options,
 		recovery.WithRecoveryHandlerContext(
 			func(ctx context.Context, p any) (err error) {
 				logger := log
@@ -30,7 +33,8 @@ func Recovery(log *slog.Logger, opts ...recovery.Option) grpc.UnaryServerInterce
 				return status.Error(codes.Internal, "internal error")
 			},
 		),
-	}
+	)
+	options = append(options, opts...)
 
-	return recovery.UnaryServerInterceptor(append(defaults, opts...)...)
+	return recovery.UnaryServerInterceptor(options...)
 }

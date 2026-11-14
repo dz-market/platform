@@ -34,11 +34,12 @@ func TestRequestID(t *testing.T) {
 						if tt.keep && id != tt.id {
 							t.Errorf("ID = %q, want = %q", id, tt.id)
 						}
+
 						if !tt.keep && (id == "" || id == tt.id) {
 							t.Errorf("expected generated ID, got %q", id)
 						}
 
-						return nil, nil
+						return struct{}{}, nil
 					},
 				)
 				if err != nil {

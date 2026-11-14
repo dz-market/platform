@@ -27,7 +27,10 @@ func RequestID() grpc.UnaryServerInterceptor {
 }
 
 func RequestIDFromContext(ctx context.Context) string {
-	id, _ := ctx.Value(requestIDKey{}).(string)
+	id, ok := ctx.Value(requestIDKey{}).(string)
+	if !ok {
+		return ""
+	}
 
 	return id
 }
