@@ -8,11 +8,9 @@ import (
 )
 
 func IsUniqueViolation(err error, constraint string) bool {
-	return isViolation(err, pgerrcode.UniqueViolation, constraint)
-}
-
-func isViolation(err error, code, constraint string) bool {
 	pgErr, ok := errors.AsType[*pgconn.PgError](err)
 
-	return ok && pgErr.Code == code && (constraint == "" || pgErr.ConstraintName == constraint)
+	return ok &&
+		pgErr.Code == pgerrcode.UniqueViolation &&
+		(constraint == "" || pgErr.ConstraintName == constraint)
 }
