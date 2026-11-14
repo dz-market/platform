@@ -42,6 +42,7 @@ func TestContextAttributes(t *testing.T) {
 				)
 
 				ctx := parent
+
 				if tt.child {
 					ctx = child
 				}
