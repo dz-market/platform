@@ -20,12 +20,5 @@ jobs:
         name: Go
         uses: dz-market/github-actions/.github/workflows/go-ci.yml@v1
         with:
-            modules: |
-                config
-                config/resolver/vault
-                database/postgres
-                grpc
-                logger
-                vault
-                internal/repotools
+            modules: auto
             test-tags: integration
