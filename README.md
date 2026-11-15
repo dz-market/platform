@@ -15,7 +15,8 @@ Shared Go libraries for services.
 ## Packages
 
 - [config](config) - configuration loading, validation and value resolution
+    - [resolver/vault](config/resolver/vault) - Vault value resolver
 - [database/postgres](database/postgres) - connection pools and transactions
 - [grpc](grpc) - server helpers and interceptors
 - [logger](logger) - structured logging and context attributes
-- [vault](vault) - AppRole authentication and configuration resolution
+- [vault](vault) - Vault client
