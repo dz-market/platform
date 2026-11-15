@@ -31,6 +31,15 @@ func LoadEnv(path string) (Env, error) {
 	}, nil
 }
 
+func (env Env) Required(name string) (string, error) {
+	value, ok := env(name)
+	if !ok || value == "" {
+		return "", fmt.Errorf("%w: environment variable %q is required", ErrNotFound, name)
+	}
+
+	return value, nil
+}
+
 func envResolver(env Env) Resolver {
 	return ResolverFunc(
 		func(_ context.Context, name string) (string, error) {
