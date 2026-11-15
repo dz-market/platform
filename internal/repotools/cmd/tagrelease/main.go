@@ -14,6 +14,7 @@ import (
 func main() {
 	root := flag.String("root", "../..", "repository root")
 	releaseTag := flag.String("release-tag", os.Getenv("RELEASE_TAG"), "existing release tag")
+
 	flag.Parse()
 
 	if flag.NArg() != 0 || *releaseTag == "" {
@@ -25,6 +26,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
 	err := release.Run(ctx, *root, *releaseTag)
+
 	stop()
 
 	if err != nil {

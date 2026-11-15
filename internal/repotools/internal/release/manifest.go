@@ -2,6 +2,7 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"regexp"
@@ -30,7 +31,7 @@ func readManifest(data string) (manifest, error) {
 	}
 
 	if len(result.Modules) == 0 {
-		return manifest{}, fmt.Errorf("versions.yml: modules must not be empty")
+		return manifest{}, errors.New("versions.yml: modules must not be empty")
 	}
 
 	return result, nil

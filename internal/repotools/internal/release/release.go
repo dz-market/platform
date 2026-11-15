@@ -3,6 +3,7 @@ package release
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/dz-market/platform/internal/repotools/internal/git"
@@ -54,7 +55,7 @@ func publishMissingTags(ctx context.Context, root, commit string, tags []string)
 	}
 
 	if len(pending) == 0 {
-		fmt.Println("No new module tags to create")
+		slog.Info("No new module tags to create")
 
 		return nil
 	}
@@ -67,7 +68,7 @@ func publishMissingTags(ctx context.Context, root, commit string, tags []string)
 		return err
 	}
 
-	fmt.Printf("Published %d module tags\n", len(pending))
+	slog.Info("Published module tags", "count", len(pending))
 
 	return nil
 }
@@ -92,7 +93,7 @@ func filterMissingTags(tags []string, existing map[string]bool) []string {
 
 	for _, tag := range tags {
 		if existing[tag] {
-			fmt.Printf("Skip existing tag: %s\n", tag)
+			slog.Info("Skip existing tag", "tag", tag)
 
 			continue
 		}
@@ -109,7 +110,7 @@ func createTags(ctx context.Context, root, commit string, tags []string) error {
 			return err
 		}
 
-		fmt.Printf("Created %s at %s\n", tag, commit)
+		slog.Info("Created module tag", "tag", tag, "commit", commit)
 	}
 
 	return nil
