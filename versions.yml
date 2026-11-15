@@ -1,5 +1,5 @@
 modules:
-    config: v0.6.0
+    config: v0.7.0
     database/postgres: v0.6.0
     grpc: v0.6.0
     logger: v0.6.0
