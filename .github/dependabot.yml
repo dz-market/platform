@@ -3,13 +3,12 @@ version: 2
 updates:
     -   package-ecosystem: gomod
         directories:
-            - /config
-            - /config/resolver/vault
-            - /database/postgres
-            - /grpc
-            - /logger
-            - /vault
-            - /internal/repotools
+            - "/**/*"
+
+        exclude-paths:
+            - "**/vendor/**"
+            - "**/testdata/**"
+
         schedule:
             interval: weekly
 
