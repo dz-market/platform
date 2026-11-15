@@ -1,0 +1,116 @@
+package release
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/dz-market/platform/internal/repotools/internal/git"
+)
+
+const releaseTagPrefix = "release-"
+
+func Run(ctx context.Context, root, releaseTag string) error {
+	if !strings.HasPrefix(releaseTag, releaseTagPrefix) {
+		return fmt.Errorf("release tag must start with %q", releaseTagPrefix)
+	}
+
+	root, err := git.Run(ctx, root, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return err
+	}
+
+	commit, err := git.Run(ctx, root, "rev-parse", "--verify", fmt.Sprintf("refs/tags/%s^{commit}", releaseTag))
+	if err != nil {
+		return fmt.Errorf("resolve release tag: %w", err)
+	}
+
+	return releaseCommit(ctx, root, commit)
+}
+
+func releaseCommit(ctx context.Context, root, commit string) error {
+	data, err := git.Run(ctx, root, "show", commit+":versions.yml")
+	if err != nil {
+		return fmt.Errorf("read versions.yml: %w", err)
+	}
+
+	versions, err := readManifest(data)
+	if err != nil {
+		return err
+	}
+
+	tags, err := moduleTags(ctx, root, commit, versions)
+	if err != nil {
+		return err
+	}
+
+	return publishMissingTags(ctx, root, commit, tags)
+}
+
+func publishMissingTags(ctx context.Context, root, commit string, tags []string) error {
+	pending, err := missingTags(ctx, root, tags)
+	if err != nil {
+		return err
+	}
+
+	if len(pending) == 0 {
+		fmt.Println("No new module tags to create")
+
+		return nil
+	}
+
+	if err := createTags(ctx, root, commit, pending); err != nil {
+		return err
+	}
+
+	if err := git.PushTags(ctx, root, pending); err != nil {
+		return err
+	}
+
+	fmt.Printf("Published %d module tags\n", len(pending))
+
+	return nil
+}
+
+func missingTags(ctx context.Context, root string, tags []string) ([]string, error) {
+	existingTags, err := git.Tags(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+
+	existing := make(map[string]bool, len(existingTags))
+
+	for _, tag := range existingTags {
+		existing[tag] = true
+	}
+
+	return filterMissingTags(tags, existing), nil
+}
+
+func filterMissingTags(tags []string, existing map[string]bool) []string {
+	pending := make([]string, 0, len(tags))
+
+	for _, tag := range tags {
+		if existing[tag] {
+			fmt.Printf("Skip existing tag: %s\n", tag)
+
+			continue
+		}
+
+		pending = append(pending, tag)
+	}
+
+	return pending
+}
+
+func createTags(ctx context.Context, root, commit string, tags []string) error {
+	for _, tag := range tags {
+		if err := git.Tag(ctx, root, tag, commit); err != nil {
+			return err
+		}
+
+		fmt.Printf("Created %s at %s\n", tag, commit)
+	}
+
+	return nil
+}

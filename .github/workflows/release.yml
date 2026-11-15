@@ -2,52 +2,35 @@ name: Release module tags
 
 on:
     push:
-        tags: ["v*.*.*"]
+        tags: ["release-*"]
 
 permissions:
     contents: write
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
+    group: module-release
     cancel-in-progress: false
 
 jobs:
     tags:
         name: Tag modules
         runs-on: ubuntu-latest
-
-        env:
-            RELEASE_TAG: ${{ github.ref_name }}
-            MODULES: >-
-                config
-                database/postgres
-                grpc
-                logger
-                vault
+        timeout-minutes: 10
 
         steps:
             -   uses: actions/checkout@v7
                 with:
+                    ref: ${{ github.ref }}
                     fetch-depth: 0
+                    persist-credentials: true
+
+            -   uses: actions/setup-go@v7
+                with:
+                    go-version-file: internal/repotools/go.mod
+                    cache-dependency-path: internal/repotools/go.sum
 
             -   name: Create module tags
-                shell: bash
-                run: |
-                    set -euo pipefail
-                    
-                    commit=$(git rev-parse "${RELEASE_TAG}^{commit}")
-                    tags=()
-                    
-                    for module in $MODULES; do
-                      tag="$module/$RELEASE_TAG"
-
-                      if git show-ref --verify --quiet "refs/tags/$tag"; then
-                          test "$(git rev-parse "${tag}^{commit}")" = "$commit"
-                      else
-                          git tag "$tag" "$commit"
-                      fi
-
-                      tags+=("refs/tags/$tag")
-                    done
-                    
-                    git push --atomic origin "${tags[@]}"
+                working-directory: internal/repotools
+                env:
+                    RELEASE_TAG: ${{ github.ref_name }}
+                run: go run ./cmd/tagrelease -root ../..

@@ -26,4 +26,5 @@ jobs:
                 grpc
                 logger
                 vault
+                internal/repotools
             test-tags: integration

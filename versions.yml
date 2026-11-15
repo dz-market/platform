@@ -1,0 +1,6 @@
+modules:
+    config: v0.6.0
+    database/postgres: v0.6.0
+    grpc: v0.6.0
+    logger: v0.6.0
+    vault: v0.6.0
