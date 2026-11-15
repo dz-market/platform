@@ -1,11 +1,11 @@
 package config
 
 import (
-	"errors"
 	"log/slog"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDecode(t *testing.T) {
@@ -22,9 +22,7 @@ func TestDecode(t *testing.T) {
 	}
 
 	got, err := decode[testConfig](tree)
-	if err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := testConfig{
 		Duration: 10 * time.Second,
@@ -36,9 +34,7 @@ func TestDecode(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("decode() = %+v, want = %+v", got, want)
-	}
+	require.Equal(t, want, got)
 }
 
 func TestDecodeRejects(t *testing.T) {
@@ -59,9 +55,8 @@ func TestDecodeRejects(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				if _, err := decode[testConfig](tt.tree); !errors.Is(err, ErrDecodeConfig) {
-					t.Errorf("decode() error = %v, want %v", err, ErrDecodeConfig)
-				}
+				_, err := decode[testConfig](tt.tree)
+				require.ErrorIs(t, err, ErrDecodeConfig)
 			},
 		)
 	}
@@ -70,12 +65,13 @@ func TestDecodeRejects(t *testing.T) {
 func TestDecodeMissingLevelDefaultsToInfo(t *testing.T) {
 	t.Parallel()
 
-	got, err := decode[testConfig](map[string]any{"nested": map[string]any{"string": "value"}})
-	if err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-
-	if got.Nested.Level != slog.LevelInfo {
-		t.Errorf("Nested.Level = %v, want INFO", got.Nested.Level)
-	}
+	got, err := decode[testConfig](
+		map[string]any{
+			"nested": map[string]any{
+				"string": "value",
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, slog.LevelInfo, got.Nested.Level)
 }

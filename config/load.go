@@ -83,7 +83,7 @@ func load[T any](ctx context.Context, opts ...Option) (cfg T, err error) {
 			return cfg, fmt.Errorf("load env: %w", err)
 		}
 
-		l.resolvers[schemeEnv] = envResolver(env)
+		l.resolvers[schemeEnv] = env
 	}
 
 	raw, err := os.ReadFile(l.configPath)

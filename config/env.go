@@ -12,6 +12,8 @@ import (
 
 const schemeEnv = "env"
 
+var _ Resolver = Env(nil)
+
 type Env func(name string) (string, bool)
 
 func LoadEnv(path string) (Env, error) {
@@ -31,18 +33,23 @@ func LoadEnv(path string) (Env, error) {
 	}, nil
 }
 
-func envResolver(env Env) Resolver {
-	return ResolverFunc(
-		func(_ context.Context, name string) (string, error) {
-			if name == "" {
-				return "", fmt.Errorf("%w: empty variable name", ErrInvalidReference)
-			}
+func (env Env) Required(name string) (string, error) {
+	value, ok := env(name)
+	if !ok || value == "" {
+		return "", fmt.Errorf("%w: environment variable %q is required", ErrNotFound, name)
+	}
 
-			if v, ok := env(name); ok {
-				return v, nil
-			}
+	return value, nil
+}
 
-			return "", ErrNotFound
-		},
-	)
+func (env Env) Resolve(_ context.Context, name string) (any, error) {
+	if name == "" {
+		return nil, fmt.Errorf("%w: empty variable name", ErrInvalidReference)
+	}
+
+	if value, ok := env(name); ok {
+		return value, nil
+	}
+
+	return nil, ErrNotFound
 }

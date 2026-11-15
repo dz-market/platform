@@ -1,19 +1,19 @@
 package config
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func writeEnv(t *testing.T, content string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), ".env")
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write .env: %v", err)
-	}
+	err := os.WriteFile(path, []byte(content), 0o600)
+	require.NoError(t, err)
 
 	return path
 }
@@ -25,9 +25,7 @@ func TestEnvLookupPrecedence(t *testing.T) {
 	t.Setenv("BOTH", "env")
 
 	env, err := LoadEnv(path)
-	if err != nil {
-		t.Fatalf("LoadEnv: %v", err)
-	}
+	require.NoError(t, err)
 
 	tests := []struct {
 		name   string
@@ -45,9 +43,8 @@ func TestEnvLookupPrecedence(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				got, ok := env(tt.key)
-				if got != tt.want || ok != tt.wantOK {
-					t.Errorf("lookup(%q) = (%q, %v), want (%q, %v)", tt.key, got, ok, tt.want, tt.wantOK)
-				}
+				require.Equal(t, tt.want, got)
+				require.Equal(t, tt.wantOK, ok)
 			},
 		)
 	}
@@ -57,33 +54,27 @@ func TestEnvLookupMissingFileIsNotAnError(t *testing.T) {
 	t.Parallel()
 
 	env, err := LoadEnv(filepath.Join(t.TempDir(), "absent"))
-	if err != nil {
-		t.Fatalf("LoadEnv: %v", err)
-	}
+	require.NoError(t, err)
 
-	if _, ok := env("ANYTHING"); ok {
-		t.Error("lookup found a value with no .env file")
-	}
+	_, ok := env("ANYTHING")
+	require.False(t, ok)
 }
 
 func TestEnvLookupUnreadableFile(t *testing.T) {
 	t.Parallel()
 
-	if _, err := LoadEnv(t.TempDir()); err == nil {
-		t.Error("LoadEnv on a directory: want error, got nil")
-	}
+	_, err := LoadEnv(t.TempDir())
+	require.Error(t, err)
 }
 
 func TestEnvResolver(t *testing.T) {
 	t.Parallel()
 
-	r := envResolver(
-		lookupFrom(
-			map[string]string{
-				"SET":   "value",
-				"EMPTY": "",
-			},
-		),
+	r := lookupFrom(
+		map[string]string{
+			"SET":   "value",
+			"EMPTY": "",
+		},
 	)
 
 	tests := []struct {
@@ -104,13 +95,47 @@ func TestEnvResolver(t *testing.T) {
 				t.Parallel()
 
 				got, err := r.Resolve(t.Context(), tt.ref)
-				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("Resolve(%q) error = %v, want %v", tt.ref, err, tt.wantErr)
+				require.ErrorIs(t, err, tt.wantErr)
+
+				if tt.wantErr != nil {
+					return
 				}
 
-				if got != tt.want {
-					t.Errorf("Resolve(%q) = %q, want %q", tt.ref, got, tt.want)
-				}
+				require.Equal(t, tt.want, got)
+			},
+		)
+	}
+}
+
+func TestEnvRequired(t *testing.T) {
+	t.Parallel()
+
+	env := lookupFrom(
+		map[string]string{
+			"STRING": "value",
+			"EMPTY":  "",
+		},
+	)
+
+	tests := []struct {
+		name    string
+		key     string
+		want    string
+		wantErr error
+	}{
+		{name: "string", key: "STRING", want: "value"},
+		{name: "missing", key: "MISSING", wantErr: ErrNotFound},
+		{name: "empty", key: "EMPTY", wantErr: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				got, err := env.Required(tt.key)
+				require.ErrorIs(t, err, tt.wantErr)
+				require.Equal(t, tt.want, got)
 			},
 		)
 	}

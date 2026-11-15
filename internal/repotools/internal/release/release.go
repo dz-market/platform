@@ -2,18 +2,16 @@ package release
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/dz-market/platform/internal/repotools/internal/git"
 )
 
-const releaseTagPrefix = "release-"
-
-func Run(ctx context.Context, root, releaseTag string) error {
-	if !strings.HasPrefix(releaseTag, releaseTagPrefix) {
-		return fmt.Errorf("release tag must start with %q", releaseTagPrefix)
+func Run(ctx context.Context, root, ref string) error {
+	if ref == "" {
+		return errors.New("release ref is required")
 	}
 
 	root, err := git.Run(ctx, root, "rev-parse", "--show-toplevel")
@@ -21,9 +19,9 @@ func Run(ctx context.Context, root, releaseTag string) error {
 		return err
 	}
 
-	commit, err := git.Run(ctx, root, "rev-parse", "--verify", fmt.Sprintf("refs/tags/%s^{commit}", releaseTag))
+	commit, err := git.Run(ctx, root, "rev-parse", "--verify", "--end-of-options", fmt.Sprintf("%s^{commit}", ref))
 	if err != nil {
-		return fmt.Errorf("resolve release tag: %w", err)
+		return fmt.Errorf("resolve release ref: %w", err)
 	}
 
 	return releaseCommit(ctx, root, commit)

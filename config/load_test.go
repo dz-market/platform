@@ -2,13 +2,13 @@ package config
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"log/slog"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type testConfig struct {
@@ -28,7 +28,7 @@ func noLookup(string) (string, bool) {
 }
 
 func withEnv(env Env) Option {
-	return WithResolver(schemeEnv, envResolver(env))
+	return WithResolver(schemeEnv, env)
 }
 
 func lookupFrom(vars map[string]string) Env {
@@ -47,9 +47,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
 	got, err := load[testConfig](t.Context(), testdataFile("valid.yml"), withEnv(noLookup))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := testConfig{
 		Duration: 10 * time.Second,
@@ -61,9 +59,7 @@ func TestLoadAppliesDefaults(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("load() = %+v, want %+v", got, want)
-	}
+	require.Equal(t, want, got)
 }
 
 func TestLoadPrefersLookupOverDefaults(t *testing.T) {
@@ -80,9 +76,7 @@ func TestLoadPrefersLookupOverDefaults(t *testing.T) {
 	)
 
 	got, err := load[testConfig](t.Context(), testdataFile("valid.yml"), withEnv(lookup))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
+	require.NoError(t, err)
 
 	want := testConfig{
 		Duration: 30 * time.Second,
@@ -94,9 +88,7 @@ func TestLoadPrefersLookupOverDefaults(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("load() = %+v, want %+v", got, want)
-	}
+	require.Equal(t, want, got)
 }
 
 func TestLoadErrors(t *testing.T) {
@@ -121,9 +113,7 @@ func TestLoadErrors(t *testing.T) {
 				t.Parallel()
 
 				_, err := load[testConfig](t.Context(), testdataFile(tt.file), withEnv(noLookup))
-				if !errors.Is(err, tt.wantErr) {
-					t.Errorf("load() error = %v, want %v", err, tt.wantErr)
-				}
+				require.ErrorIs(t, err, tt.wantErr)
 			},
 		)
 	}
@@ -133,14 +123,10 @@ func TestLoadReportsMissingReferences(t *testing.T) {
 	t.Parallel()
 
 	_, err := load[testConfig](t.Context(), testdataFile("unresolved.yml"), withEnv(noLookup))
-	if err == nil {
-		t.Fatal("load() error = nil, want missing references")
-	}
+	require.Error(t, err)
 
 	for _, ref := range []string{"${env:DURATION}", "${env:STRING}"} {
-		if !strings.Contains(err.Error(), ref) {
-			t.Errorf("load() error = %q, want it to mention %s", err, ref)
-		}
+		require.ErrorContains(t, err, ref)
 	}
 }
 
@@ -150,22 +136,15 @@ func TestLoadReadsEnvFile(t *testing.T) {
 	path := writeEnv(t, "STRING=from-file")
 
 	got, err := load[testConfig](t.Context(), testdataFile("valid.yml"), WithEnvPath(path))
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-
-	if got.Nested.String != "from-file" {
-		t.Errorf("Nested.String = %q, want = %q", got.Nested.String, "from-file")
-	}
+	require.NoError(t, err)
+	require.Equal(t, "from-file", got.Nested.String)
 }
 
 func TestLoadValidates(t *testing.T) {
 	t.Parallel()
 
 	_, err := Load[validatable](t.Context(), testdataFile("empty.yml"), withEnv(noLookup))
-	if !errors.Is(err, ErrValidation) {
-		t.Errorf("Load() error = %v, want %v", err, ErrValidation)
-	}
+	require.ErrorIs(t, err, ErrValidation)
 }
 
 func TestLoadUsesRegisteredResolver(t *testing.T) {
@@ -174,25 +153,82 @@ func TestLoadUsesRegisteredResolver(t *testing.T) {
 	var gotRef string
 
 	resolver := ResolverFunc(
-		func(_ context.Context, ref string) (string, error) {
+		func(_ context.Context, ref string) (any, error) {
 			gotRef = ref
 
 			return "line1\nline2", nil
 		},
 	)
 
-	got, err := load[testConfig](t.Context(), testdataFile("custom.yml"), WithResolver("custom", resolver))
-	if err != nil {
-		t.Fatalf("load: %v", err)
+	got, err := load[testConfig](
+		t.Context(),
+		testdataFile("custom.yml"),
+		WithResolver("custom", resolver),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "key", gotRef)
+	require.Equal(t, "line1\nline2", got.Nested.String)
+}
+
+func TestLoadTypedValues(t *testing.T) {
+	t.Parallel()
+
+	type objectValue struct {
+		String string `yaml:"string"`
+		Number int    `yaml:"number"`
 	}
 
-	if gotRef != "key" {
-		t.Errorf("resolver got ref %q, want %q", gotRef, "key")
+	type valueConfig struct {
+		Object  objectValue `yaml:"object"`
+		List    []string    `yaml:"list"`
+		Number  int         `yaml:"number"`
+		Boolean bool        `yaml:"boolean"`
+		Null    *string     `yaml:"null"`
+		Text    string      `yaml:"text"`
 	}
 
-	if got.Nested.String != "line1\nline2" {
-		t.Errorf("Nested.String = %q, want %q", got.Nested.String, "line1\nline2")
+	values := map[string]any{
+		"object": map[string]any{
+			"string": "value",
+			"number": json.Number("10"),
+		},
+		"list":    []any{"value"},
+		"number":  json.Number("10"),
+		"boolean": true,
+		"null":    nil,
 	}
+
+	resolver := ResolverFunc(
+		func(_ context.Context, ref string) (any, error) {
+			value, ok := values[ref]
+			if !ok {
+				return nil, ErrNotFound
+			}
+
+			return value, nil
+		},
+	)
+
+	got, err := Load[valueConfig](
+		t.Context(),
+		testdataFile("typed.yml"),
+		withEnv(noLookup),
+		WithResolver("test", resolver),
+	)
+	require.NoError(t, err)
+
+	want := valueConfig{
+		Object: objectValue{
+			String: "value",
+			Number: 10,
+		},
+		List:    []string{"value"},
+		Number:  10,
+		Boolean: true,
+		Text:    "boolean=true",
+	}
+
+	require.Equal(t, want, got)
 }
 
 func TestLoadPassesContext(t *testing.T) {
@@ -202,13 +238,11 @@ func TestLoadPassesContext(t *testing.T) {
 	cancel()
 
 	resolver := ResolverFunc(
-		func(ctx context.Context, _ string) (string, error) {
-			return "", ctx.Err()
+		func(ctx context.Context, _ string) (any, error) {
+			return nil, ctx.Err()
 		},
 	)
 
 	_, err := load[testConfig](ctx, testdataFile("custom.yml"), WithResolver("custom", resolver))
-	if !errors.Is(err, context.Canceled) {
-		t.Errorf("load() error = %v, want %v", err, context.Canceled)
-	}
+	require.ErrorIs(t, err, context.Canceled)
 }
