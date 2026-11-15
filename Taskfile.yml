@@ -1,7 +1,16 @@
 version: "3"
 
 vars:
-    MODULES: '{{.CLI_ARGS | default "config config/resolver/vault database/postgres grpc logger vault internal/repotools"}}'
+    MODULES:
+        sh: |
+            {{if .CLI_ARGS}}
+            printf '%s\n' {{.CLI_ARGS | shellQuote}}
+            {{else}}
+            find . \
+                -type d \( -name .git -o -name vendor -o -name testdata \) -prune -o \
+                -type f -name go.mod -exec dirname {} \; |
+                LC_ALL=C sort
+            {{end}}
 
 tasks:
     lint:
