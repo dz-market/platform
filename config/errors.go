@@ -11,6 +11,7 @@ var (
 	ErrMissingReference = errors.New("missing reference")
 	ErrResolverFailed   = errors.New("resolver failed")
 	ErrInvalidReference = errors.New("invalid reference")
+	ErrInvalidValue     = errors.New("invalid configuration value")
 
 	ErrNotFound = errors.New("not found")
 )

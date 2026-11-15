@@ -19,7 +19,7 @@ func testLookup(name string) (string, bool) {
 func newTestExpander() *expander {
 	return newExpander(
 		map[string]Resolver{
-			schemeEnv: envResolver(testLookup),
+			schemeEnv: Env(testLookup),
 		},
 	)
 }
@@ -129,7 +129,7 @@ func TestExpanderCachesResults(t *testing.T) {
 	e := newExpander(
 		map[string]Resolver{
 			"count": ResolverFunc(
-				func(context.Context, string) (string, error) {
+				func(context.Context, string) (any, error) {
 					calls++
 
 					return "value", nil
@@ -152,7 +152,7 @@ func TestExpanderResolverFailure(t *testing.T) {
 	e := newExpander(
 		map[string]Resolver{
 			"fail": ResolverFunc(
-				func(context.Context, string) (string, error) {
+				func(context.Context, string) (any, error) {
 					return "", boom
 				},
 			),

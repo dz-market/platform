@@ -28,7 +28,7 @@ func noLookup(string) (string, bool) {
 }
 
 func withEnv(env Env) Option {
-	return WithResolver(schemeEnv, envResolver(env))
+	return WithResolver(schemeEnv, env)
 }
 
 func lookupFrom(vars map[string]string) Env {
@@ -174,7 +174,7 @@ func TestLoadUsesRegisteredResolver(t *testing.T) {
 	var gotRef string
 
 	resolver := ResolverFunc(
-		func(_ context.Context, ref string) (string, error) {
+		func(_ context.Context, ref string) (any, error) {
 			gotRef = ref
 
 			return "line1\nline2", nil
@@ -202,7 +202,7 @@ func TestLoadPassesContext(t *testing.T) {
 	cancel()
 
 	resolver := ResolverFunc(
-		func(ctx context.Context, _ string) (string, error) {
+		func(ctx context.Context, _ string) (any, error) {
 			return "", ctx.Err()
 		},
 	)

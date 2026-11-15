@@ -77,13 +77,11 @@ func TestEnvLookupUnreadableFile(t *testing.T) {
 func TestEnvResolver(t *testing.T) {
 	t.Parallel()
 
-	r := envResolver(
-		lookupFrom(
-			map[string]string{
-				"SET":   "value",
-				"EMPTY": "",
-			},
-		),
+	r := lookupFrom(
+		map[string]string{
+			"SET":   "value",
+			"EMPTY": "",
+		},
 	)
 
 	tests := []struct {
@@ -105,11 +103,15 @@ func TestEnvResolver(t *testing.T) {
 
 				got, err := r.Resolve(t.Context(), tt.ref)
 				if !errors.Is(err, tt.wantErr) {
-					t.Fatalf("Resolve(%q) error = %v, want %v", tt.ref, err, tt.wantErr)
+					t.Fatalf("Resolve() error = %v, want %v", err, tt.wantErr)
+				}
+
+				if tt.wantErr != nil {
+					return
 				}
 
 				if got != tt.want {
-					t.Errorf("Resolve(%q) = %q, want %q", tt.ref, got, tt.want)
+					t.Errorf("Resolve() = %q, want %q", got, tt.want)
 				}
 			},
 		)

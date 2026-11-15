@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -13,7 +14,7 @@ import (
 var refPattern = regexp.MustCompile(`\$\$|\$\{[^{}]*\}`)
 
 type result struct {
-	value string
+	value any
 	err   error
 }
 
@@ -55,41 +56,58 @@ func (e *expander) node(ctx context.Context, node any) any {
 	}
 }
 
-func (e *expander) string(ctx context.Context, s string) string {
+func (e *expander) string(ctx context.Context, text string) any {
+	match := refPattern.FindString(text)
+
+	if match != "" && match != "$$" && match == text {
+		return e.ref(ctx, match)
+	}
+
 	return refPattern.ReplaceAllStringFunc(
-		s, func(match string) string {
+		text, func(match string) string {
 			if match == "$$" {
 				return "$"
 			}
 
-			return e.ref(ctx, match)
+			switch value := e.ref(ctx, match).(type) {
+			case string:
+				return value
+
+			case bool, json.Number:
+				return fmt.Sprint(value)
+
+			default:
+				e.errs[match] = fmt.Errorf("%w: %s: unsupported value for text interpolation", ErrInvalidValue, match)
+
+				return ""
+			}
 		},
 	)
 }
 
-func (e *expander) ref(ctx context.Context, match string) string {
+func (e *expander) ref(ctx context.Context, match string) any {
 	inner := match[2 : len(match)-1]
 
 	scheme, rest, ok := strings.Cut(inner, ":")
 	if !ok || scheme == "" {
-		e.errs[match] = fmt.Errorf("%w: %s: missing scheme, use ${%s:%s}", ErrInvalidReference, match, schemeEnv, inner)
+		e.errs[match] = fmt.Errorf("%w: %s: missing scheme", ErrInvalidReference, match)
 
 		return ""
 	}
 
-	r, ok := e.resolvers[scheme]
+	resolver, ok := e.resolvers[scheme]
 	if !ok {
 		e.errs[match] = fmt.Errorf("%w: %s: unknown scheme %q", ErrInvalidReference, match, scheme)
 
 		return ""
 	}
 
-	ref, def, hasDefault := strings.Cut(rest, ":-")
+	ref, fallback, hasFallback := strings.Cut(rest, ":-")
 	key := scheme + ":" + ref
 
 	res, ok := e.cache[key]
 	if !ok {
-		value, err := r.Resolve(ctx, ref)
+		value, err := resolver.Resolve(ctx, ref)
 		res = result{
 			value: value,
 			err:   err,
@@ -101,17 +119,14 @@ func (e *expander) ref(ctx context.Context, match string) string {
 	case res.err == nil:
 		return res.value
 
-	case errors.Is(res.err, ErrNotFound) && hasDefault:
-		return def
+	case errors.Is(res.err, ErrNotFound) && hasFallback:
+		return fallback
 
 	case errors.Is(res.err, ErrNotFound):
 		e.errs[match] = fmt.Errorf("%w: %s", ErrMissingReference, match)
 
-	case errors.Is(res.err, ErrInvalidReference):
-		e.errs[match] = fmt.Errorf(
-			"%w: %s: %s",
-			ErrInvalidReference, match, strings.TrimPrefix(res.err.Error(), ErrInvalidReference.Error()+": "),
-		)
+	case errors.Is(res.err, ErrInvalidReference), errors.Is(res.err, ErrInvalidValue):
+		e.errs[match] = fmt.Errorf("%s: %w", match, res.err)
 
 	default:
 		e.errs[match] = fmt.Errorf("%w: %s: %w", ErrResolverFailed, match, res.err)
