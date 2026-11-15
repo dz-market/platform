@@ -1,0 +1,6 @@
+object: "${test:object}"
+list: "${test:list}"
+number: "${test:number}"
+boolean: "${test:boolean}"
+"null": "${test:null}"
+text: "boolean=${test:boolean}"

@@ -117,3 +117,42 @@ func TestEnvResolver(t *testing.T) {
 		)
 	}
 }
+
+func TestEnvRequired(t *testing.T) {
+	t.Parallel()
+
+	env := lookupFrom(
+		map[string]string{
+			"STRING": "value",
+			"EMPTY":  "",
+		},
+	)
+
+	tests := []struct {
+		name    string
+		key     string
+		want    string
+		wantErr error
+	}{
+		{name: "string", key: "STRING", want: "value"},
+		{name: "missing", key: "MISSING", wantErr: ErrNotFound},
+		{name: "empty", key: "EMPTY", wantErr: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				got, err := env.Required(tt.key)
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Required(%q) error = %v, want %v", tt.key, err, tt.wantErr)
+				}
+
+				if got != tt.want {
+					t.Errorf("Required(%q) = %q, want %q", tt.key, got, tt.want)
+				}
+			},
+		)
+	}
+}

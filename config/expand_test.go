@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -66,6 +67,117 @@ func TestExpanderString(t *testing.T) {
 
 				if got != tt.want {
 					t.Errorf("string(%q) = %q, want %q", tt.in, got, tt.want)
+				}
+			},
+		)
+	}
+}
+
+func TestExpanderTypedValues(t *testing.T) {
+	t.Parallel()
+
+	object := map[string]any{"string": "value"}
+	list := []any{"value"}
+	number := json.Number("10")
+
+	tests := []struct {
+		name    string
+		in      string
+		value   any
+		want    any
+		wantErr error
+	}{
+		{
+			name:  "object",
+			in:    "${test:value}",
+			value: object,
+			want:  object,
+		},
+		{
+			name:  "list",
+			in:    "${test:value}",
+			value: list,
+			want:  list,
+		},
+		{
+			name:  "number",
+			in:    "${test:value}",
+			value: number,
+			want:  number,
+		},
+		{
+			name:  "boolean",
+			in:    "${test:value}",
+			value: true,
+			want:  true,
+		},
+		{
+			name: "null",
+			in:   "${test:value}",
+		},
+		{
+			name: "null does not activate default",
+			in:   "${test:value:-fallback}",
+		},
+		{
+			name:  "number inside text",
+			in:    "number=${test:value}",
+			value: number,
+			want:  "number=10",
+		},
+		{
+			name:  "boolean inside text",
+			in:    "boolean=${test:value}",
+			value: true,
+			want:  "boolean=true",
+		},
+		{
+			name:    "object inside text",
+			in:      "object=${test:value}",
+			value:   object,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "list inside text",
+			in:      "list=${test:value}",
+			value:   list,
+			wantErr: ErrInvalidValue,
+		},
+		{
+			name:    "null inside text",
+			in:      "null=${test:value}",
+			wantErr: ErrInvalidValue,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				resolver := ResolverFunc(
+					func(context.Context, string) (any, error) {
+						return tt.value, nil
+					},
+				)
+
+				e := newExpander(
+					map[string]Resolver{
+						"test": resolver,
+					},
+				)
+
+				got := e.string(t.Context(), tt.in)
+				if err := e.err(); !errors.Is(err, tt.wantErr) {
+					t.Fatalf("string(%q) error = %v, want %v", tt.in, err, tt.wantErr)
+				}
+
+				if tt.wantErr != nil {
+					return
+				}
+
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("string(%q) = %#v, want %#v", tt.in, got, tt.want)
 				}
 			},
 		)

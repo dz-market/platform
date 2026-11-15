@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"path/filepath"
@@ -192,6 +193,71 @@ func TestLoadUsesRegisteredResolver(t *testing.T) {
 
 	if got.Nested.String != "line1\nline2" {
 		t.Errorf("Nested.String = %q, want %q", got.Nested.String, "line1\nline2")
+	}
+}
+
+func TestLoadTypedValues(t *testing.T) {
+	t.Parallel()
+
+	type objectValue struct {
+		String string `yaml:"string"`
+		Number int    `yaml:"number"`
+	}
+
+	type valueConfig struct {
+		Object  objectValue `yaml:"object"`
+		List    []string    `yaml:"list"`
+		Number  int         `yaml:"number"`
+		Boolean bool        `yaml:"boolean"`
+		Null    *string     `yaml:"null"`
+		Text    string      `yaml:"text"`
+	}
+
+	values := map[string]any{
+		"object": map[string]any{
+			"string": "value",
+			"number": json.Number("10"),
+		},
+		"list":    []any{"value"},
+		"number":  json.Number("10"),
+		"boolean": true,
+		"null":    nil,
+	}
+
+	resolver := ResolverFunc(
+		func(_ context.Context, ref string) (any, error) {
+			value, ok := values[ref]
+			if !ok {
+				return nil, ErrNotFound
+			}
+
+			return value, nil
+		},
+	)
+
+	got, err := Load[valueConfig](
+		t.Context(),
+		testdataFile("typed.yml"),
+		withEnv(noLookup),
+		WithResolver("test", resolver),
+	)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	want := valueConfig{
+		Object: objectValue{
+			String: "value",
+			Number: 10,
+		},
+		List:    []string{"value"},
+		Number:  10,
+		Boolean: true,
+		Text:    "boolean=true",
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Load() = %#v, want %#v", got, want)
 	}
 }
 
