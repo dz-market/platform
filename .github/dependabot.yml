@@ -4,6 +4,7 @@ updates:
     -   package-ecosystem: gomod
         directories:
             - /config
+            - /config/resolver/vault
             - /database/postgres
             - /grpc
             - /logger

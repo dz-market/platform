@@ -22,6 +22,7 @@ jobs:
         with:
             modules: |
                 config
+                config/resolver/vault
                 database/postgres
                 grpc
                 logger
