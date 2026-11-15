@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-    MODULES: '{{.CLI_ARGS | default "config database/postgres grpc logger vault internal/repotools"}}'
+    MODULES: '{{.CLI_ARGS | default "config config/resolver/vault database/postgres grpc logger vault internal/repotools"}}'
 
 tasks:
     lint:
