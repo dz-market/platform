@@ -13,19 +13,19 @@ import (
 
 func main() {
 	root := flag.String("root", "../..", "repository root")
-	releaseTag := flag.String("release-tag", os.Getenv("RELEASE_TAG"), "existing release tag")
+	ref := flag.String("ref", os.Getenv("RELEASE_REF"), "commit, branch or tag to publish")
 
 	flag.Parse()
 
-	if flag.NArg() != 0 || *releaseTag == "" {
-		_, _ = fmt.Fprintln(os.Stderr, "usage: tagrelease -root <path> -release-tag <tag>")
+	if flag.NArg() != 0 || *ref == "" {
+		_, _ = fmt.Fprintln(os.Stderr, "usage: tagrelease -root <path> -ref <ref>")
 
 		os.Exit(2)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	err := release.Run(ctx, *root, *releaseTag)
+	err := release.Run(ctx, *root, *ref)
 
 	stop()
 
