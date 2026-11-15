@@ -4,8 +4,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
-github.com/dz-market/platform/config v0.6.0 h1:o1PTybCQuvMBMY0oScjuubQSRzH6v6gRMa08WlDbFk4=
-github.com/dz-market/platform/config v0.6.0/go.mod h1:sBiaVuRHoW02MYvR9moBLs7K74Kk8aqm/FbM4jgZav0=
+github.com/dz-market/platform/config v0.7.0 h1:xheoxFLLTya3p0w2CoZNck8mjvwujTuI5NIUWPw+U/w=
+github.com/dz-market/platform/config v0.7.0/go.mod h1:o08aBxPOyjTRr1HmuSWV/nboRKHdZDSqnMhZrLwtZYs=
 github.com/dz-market/platform/vault v0.6.0 h1:hCuJp1jxKhKH3IRDNt6Fh1nLCAxQV7v9BYDq159MQBo=
 github.com/dz-market/platform/vault v0.6.0/go.mod h1:pvgo3C6LPxCZs8xijjeUwYK13byFLqSVeDQmaOvXDU8=
 github.com/fatih/color v1.18.0 h1:S8gINlzdQ840/4pfAwic/ZE0djQEH3wM94VfqLTZcOM=
