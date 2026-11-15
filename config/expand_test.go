@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func testLookup(name string) (string, bool) {
@@ -61,13 +62,8 @@ func TestExpanderString(t *testing.T) {
 				e := newTestExpander()
 
 				got := e.string(t.Context(), tt.in)
-				if err := e.err(); !errors.Is(err, tt.wantErr) {
-					t.Errorf("string(%q) error = %v, want %v", tt.in, err, tt.wantErr)
-				}
-
-				if got != tt.want {
-					t.Errorf("string(%q) = %q, want %q", tt.in, got, tt.want)
-				}
+				require.ErrorIs(t, e.err(), tt.wantErr)
+				require.Equal(t, tt.want, got)
 			},
 		)
 	}
@@ -168,17 +164,13 @@ func TestExpanderTypedValues(t *testing.T) {
 				)
 
 				got := e.string(t.Context(), tt.in)
-				if err := e.err(); !errors.Is(err, tt.wantErr) {
-					t.Fatalf("string(%q) error = %v, want %v", tt.in, err, tt.wantErr)
-				}
+				require.ErrorIs(t, e.err(), tt.wantErr)
 
 				if tt.wantErr != nil {
 					return
 				}
 
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("string(%q) = %#v, want %#v", tt.in, got, tt.want)
-				}
+				require.Equal(t, tt.want, got)
 			},
 		)
 	}
@@ -222,13 +214,8 @@ func TestExpanderNode(t *testing.T) {
 				e := newTestExpander()
 
 				got := e.node(t.Context(), tt.node)
-				if err := e.err(); !errors.Is(err, tt.wantErr) {
-					t.Fatalf("node() error = %v, want %v", err, tt.wantErr)
-				}
-
-				if !reflect.DeepEqual(got, tt.want) {
-					t.Errorf("node() = %#v, want %#v", got, tt.want)
-				}
+				require.ErrorIs(t, e.err(), tt.wantErr)
+				require.Equal(t, tt.want, got)
 			},
 		)
 	}
@@ -252,9 +239,7 @@ func TestExpanderCachesResults(t *testing.T) {
 
 	e.string(t.Context(), "${count:x}${count:x:-fallback}")
 
-	if calls != 1 {
-		t.Errorf("resolver calls = %d, want 1", calls)
-	}
+	require.Equal(t, 1, calls)
 }
 
 func TestExpanderResolverFailure(t *testing.T) {
@@ -265,7 +250,7 @@ func TestExpanderResolverFailure(t *testing.T) {
 		map[string]Resolver{
 			"fail": ResolverFunc(
 				func(context.Context, string) (any, error) {
-					return "", boom
+					return nil, boom
 				},
 			),
 		},
@@ -274,11 +259,6 @@ func TestExpanderResolverFailure(t *testing.T) {
 	e.string(t.Context(), "${fail:key:-fallback}")
 
 	err := e.err()
-	if !errors.Is(err, ErrResolverFailed) {
-		t.Errorf("err() = %v, want %v", err, ErrResolverFailed)
-	}
-
-	if !errors.Is(err, boom) {
-		t.Errorf("err() = %v, want it to wrap %v", err, boom)
-	}
+	require.ErrorIs(t, err, ErrResolverFailed)
+	require.ErrorIs(t, err, boom)
 }

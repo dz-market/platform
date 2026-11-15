@@ -2,6 +2,8 @@ package config
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type validatable struct {
@@ -32,9 +34,14 @@ func TestValidate(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				if err := validate(tt.give); (err != nil) != tt.wantErr {
-					t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
+				err := validate(tt.give)
+				if tt.wantErr {
+					require.Error(t, err)
+
+					return
 				}
+
+				require.NoError(t, err)
 			},
 		)
 	}
