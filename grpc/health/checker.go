@@ -41,7 +41,13 @@ func (c *Checker) runChecks(ctx context.Context) {
 			return
 		}
 
-		c.setHealthy(c.check(ctx))
+		status := healthpb.HealthCheckResponse_NOT_SERVING
+
+		if c.check(ctx) {
+			status = healthpb.HealthCheckResponse_SERVING
+		}
+
+		c.setStatus(status)
 
 		timer.Reset(c.period)
 	}
@@ -67,17 +73,12 @@ func (c *Checker) check(ctx context.Context) bool {
 	return healthy
 }
 
-func (c *Checker) setHealthy(healthy bool) {
+func (c *Checker) setStatus(status healthpb.HealthCheckResponse_ServingStatus) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.state != stateRunning {
 		return
-	}
-
-	status := healthpb.HealthCheckResponse_NOT_SERVING
-	if healthy {
-		status = healthpb.HealthCheckResponse_SERVING
 	}
 
 	c.health.SetServingStatus("", status)

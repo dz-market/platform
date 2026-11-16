@@ -60,11 +60,11 @@ func New(registrar grpc.ServiceRegistrar, opts Options) (*Checker, error) {
 
 func (c *Checker) Register(name string, opts DependencyOptions, ping func(context.Context) error) error {
 	if name == "" {
-		return fmt.Errorf("dependency name must not be empty")
+		return errors.New("dependency name must not be empty")
 	}
 
 	if ping == nil {
-		return fmt.Errorf("dependency ping function must not be nil")
+		return errors.New("dependency ping function must not be nil")
 	}
 
 	if opts.Timeout < 0 {

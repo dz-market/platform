@@ -54,12 +54,14 @@ func TestChecker_HealthTransitions(t *testing.T) {
 			assertStatus(t, registrar, healthpb.HealthCheckResponse_SERVING)
 
 			unavailable = true
+
 			time.Sleep(period)
 			synctest.Wait()
 
 			assertStatus(t, registrar, healthpb.HealthCheckResponse_NOT_SERVING)
 
 			unavailable = false
+
 			time.Sleep(period)
 			synctest.Wait()
 
@@ -128,7 +130,12 @@ type healthRegistrar struct {
 }
 
 func (r *healthRegistrar) RegisterService(_ *grpc.ServiceDesc, impl any) {
-	r.server = impl.(healthpb.HealthServer)
+	server, ok := impl.(healthpb.HealthServer)
+	if !ok {
+		return
+	}
+
+	r.server = server
 }
 
 func newChecker(t *testing.T, opts health.Options) (*health.Checker, *healthRegistrar) {
