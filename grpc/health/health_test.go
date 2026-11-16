@@ -3,6 +3,7 @@ package health_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -26,7 +27,7 @@ func TestChecker_HealthTransitions(t *testing.T) {
 				},
 			)
 
-			unavailable := false
+			var unavailable atomic.Bool
 
 			require.NoError(
 				t, checker.Register(
@@ -39,7 +40,7 @@ func TestChecker_HealthTransitions(t *testing.T) {
 			require.NoError(
 				t, checker.Register(
 					"dep-2", health.DependencyOptions{}, func(context.Context) error {
-						if unavailable {
+						if unavailable.Load() {
 							return errors.New("dep-2 unavailable")
 						}
 
@@ -53,14 +54,14 @@ func TestChecker_HealthTransitions(t *testing.T) {
 			startChecker(t, checker)
 			assertStatus(t, registrar, healthpb.HealthCheckResponse_SERVING)
 
-			unavailable = true
+			unavailable.Store(true)
 
 			time.Sleep(period)
 			synctest.Wait()
 
 			assertStatus(t, registrar, healthpb.HealthCheckResponse_NOT_SERVING)
 
-			unavailable = false
+			unavailable.Store(false)
 
 			time.Sleep(period)
 			synctest.Wait()
