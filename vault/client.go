@@ -11,6 +11,18 @@ type Client struct {
 	api *api.Client
 }
 
+func NewWithAddr(addr string) (*Client, error) {
+	if addr == "" {
+		return nil, errors.New("address is required")
+	}
+
+	cfg := api.DefaultConfig()
+	cfg.Address = addr
+	cfg.AgentAddress = ""
+
+	return New(cfg)
+}
+
 func New(cfg *api.Config) (*Client, error) {
 	if cfg == nil {
 		return nil, errors.New("config is required")
