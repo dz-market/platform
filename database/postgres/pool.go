@@ -97,43 +97,28 @@ func applyOptions(cfg *pgxpool.Config, opts Options) error {
 }
 
 func validateConfig(cfg *pgxpool.Config) error {
-	if cfg.ConnConfig == nil {
+	switch {
+	case cfg.ConnConfig == nil:
 		return errors.New("connection config is required")
-	}
-
-	if cfg.MaxConns <= 0 {
+	case cfg.MaxConns <= 0:
 		return errors.New("max connections must be positive")
-	}
-
-	if cfg.MinConns < 0 || cfg.MinConns > cfg.MaxConns {
+	case cfg.MinConns < 0 || cfg.MinConns > cfg.MaxConns:
 		return errors.New("min connections must be between zero and max connections")
-	}
-
-	if cfg.MinIdleConns < 0 || cfg.MinIdleConns > cfg.MaxConns {
+	case cfg.MinIdleConns < 0 || cfg.MinIdleConns > cfg.MaxConns:
 		return errors.New("min idle connections must be between zero and max connections")
-	}
-
-	if cfg.HealthCheckPeriod <= 0 {
+	case cfg.HealthCheckPeriod <= 0:
 		return errors.New("health check period must be positive")
-	}
-
-	if cfg.MaxConnLifetime < 0 {
+	case cfg.MaxConnLifetime < 0:
 		return errors.New("max connection lifetime durations must not be negative")
-	}
-
-	if cfg.MaxConnLifetimeJitter < 0 {
+	case cfg.MaxConnLifetimeJitter < 0:
 		return errors.New("max connection lifetime jitter durations must not be negative")
-	}
-
-	if cfg.MaxConnIdleTime < 0 {
+	case cfg.MaxConnIdleTime < 0:
 		return errors.New("max connection idle time must not be negative")
-	}
-
-	if cfg.ConnConfig.ConnectTimeout < 0 {
+	case cfg.ConnConfig.ConnectTimeout < 0:
 		return errors.New("connect timeout must not be negative")
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 func applyOption[T any](dst, value *T) {
