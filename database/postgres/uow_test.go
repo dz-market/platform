@@ -60,50 +60,52 @@ func TestUnitOfWork(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pool, uow := newUnitOfWork(t, dsn)
+		t.Run(
+			tt.name, func(t *testing.T) {
+				pool, uow := newUnitOfWork(t, dsn)
 
-			ctx, cancel := context.WithTimeout(t.Context(), operationTimeout)
-			defer cancel()
+				ctx, cancel := context.WithTimeout(t.Context(), operationTimeout)
+				defer cancel()
 
-			var gotErr error
-			var gotPanic any
+				var gotErr error
+				var gotPanic any
 
-			func() {
-				defer func() {
-					gotPanic = recover()
+				func() {
+					defer func() {
+						gotPanic = recover()
+					}()
+
+					gotErr = uow.Do(
+						ctx, func(q postgres.Querier) error {
+							_, err := q.Exec(ctx, insertQuery, 1)
+							if err != nil {
+								return err
+							}
+
+							if tt.panicValue != nil {
+								panic(tt.panicValue)
+							}
+
+							if tt.cancel {
+								cancel()
+							}
+
+							return tt.callbackErr
+						},
+					)
 				}()
 
-				gotErr = uow.Do(
-					ctx, func(q postgres.Querier) error {
-						_, err := q.Exec(ctx, insertQuery, 1)
-						if err != nil {
-							return err
-						}
+				if !errors.Is(gotErr, tt.wantErr) {
+					t.Fatalf("error = %v, want %v", gotErr, tt.wantErr)
+				}
 
-						if tt.panicValue != nil {
-							panic(tt.panicValue)
-						}
+				if gotPanic != tt.wantPanic {
+					t.Fatalf("panic = %v, want %v", gotPanic, tt.wantPanic)
+				}
 
-						if tt.cancel {
-							cancel()
-						}
-
-						return tt.callbackErr
-					},
-				)
-			}()
-
-			if !errors.Is(gotErr, tt.wantErr) {
-				t.Fatalf("error = %v, want %v", gotErr, tt.wantErr)
-			}
-
-			if gotPanic != tt.wantPanic {
-				t.Fatalf("panic = %v, want %v", gotPanic, tt.wantPanic)
-			}
-
-			checkRows(t, pool, tt.wantCount)
-		})
+				checkRows(t, pool, tt.wantCount)
+			},
+		)
 	}
 }
 
@@ -138,18 +140,16 @@ func startPostgres(t *testing.T) string {
 func newUnitOfWork(t *testing.T, dsn string) (*pgxpool.Pool, *postgres.UnitOfWork[postgres.Querier]) {
 	t.Helper()
 
-	cfg, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cfg.MaxConns = 1
-	cfg.MinConns = 0
-
 	ctx, cancel := context.WithTimeout(t.Context(), operationTimeout)
 	defer cancel()
 
-	pool, err := postgres.New(ctx, cfg)
+	pool, err := postgres.New(
+		ctx, postgres.Options{
+			DSN:      dsn,
+			MaxConns: new(int32(1)),
+			MinConns: new(int32(0)),
+		},
+	)
 	if err != nil {
 		t.Fatalf("open pool: %v", err)
 	}
