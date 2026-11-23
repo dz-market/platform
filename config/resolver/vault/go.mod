@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/dz-market/platform/config v0.7.0
-	github.com/dz-market/platform/vault v0.6.0
+	github.com/dz-market/platform/vault v0.7.0
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/stretchr/testify v1.12.1
 )
