@@ -3,6 +3,7 @@ module github.com/dz-market/platform/grpc
 go 1.27.4
 
 require (
+	github.com/dz-market/platform/logctx v0.1.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.85.0

@@ -18,13 +18,7 @@ func Recovery(log *slog.Logger, opts ...recovery.Option) grpc.UnaryServerInterce
 		options,
 		recovery.WithRecoveryHandlerContext(
 			func(ctx context.Context, p any) (err error) {
-				logger := log
-
-				if id := RequestIDFromContext(ctx); id != "" {
-					logger = logger.With(slog.String("request_id", id))
-				}
-
-				logger.ErrorContext(
+				log.ErrorContext(
 					ctx, "panic recovered",
 					slog.Any("panic", p),
 					slog.String("stack", string(debug.Stack())),
