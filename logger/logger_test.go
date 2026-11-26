@@ -36,7 +36,7 @@ func TestNewIncludesContextAttributes(t *testing.T) {
 		t.Fatalf("decode log record: %v", err)
 	}
 
-	if record.RequestID != "request-1" {
+	if record.RequestID != requestID {
 		t.Errorf("request ID = %q, want %q", record.RequestID, requestID)
 	}
 }
