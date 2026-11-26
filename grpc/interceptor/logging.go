@@ -21,22 +21,12 @@ func Logging(log *slog.Logger, opts ...logging.Option) grpc.UnaryServerIntercept
 	options = append(options, opts...)
 
 	return logging.UnaryServerInterceptor(
-		slogAdapter(log),
+		logging.LoggerFunc(
+			func(ctx context.Context, level logging.Level, msg string, fields ...any) {
+				log.Log(ctx, slog.Level(level), msg, fields...)
+			},
+		),
 		options...,
-	)
-}
-
-func slogAdapter(log *slog.Logger) logging.Logger {
-	return logging.LoggerFunc(
-		func(ctx context.Context, level logging.Level, msg string, fields ...any) {
-			logger := log
-
-			if id := RequestIDFromContext(ctx); id != "" {
-				logger = logger.With(slog.String("request_id", id))
-			}
-
-			logger.Log(ctx, slog.Level(level), msg, fields...)
-		},
 	)
 }
 

@@ -1,3 +1,5 @@
+github.com/dz-market/platform/logctx v0.1.0 h1:9Kk8Av+DR0/7Vxz9sU7qjdRdJ4Vr4rg3QWqVIArZHHw=
+github.com/dz-market/platform/logctx v0.1.0/go.mod h1:EwduFz7/77zqRtaIVPpmyT36qtodXxuXkanVl8/0EWQ=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=

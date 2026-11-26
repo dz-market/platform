@@ -1,19 +1,19 @@
-package logger_test
+package logctx_test
 
 import (
 	"bytes"
-	"encoding/json/v2"
+	"encoding/json"
 	"log/slog"
 	"testing"
 
-	"github.com/dz-market/platform/logger"
+	"github.com/dz-market/platform/logctx"
 )
 
 const userID = "user-1"
 
 func TestContextAttributes(t *testing.T) {
-	parent := logger.With(t.Context(), slog.String("user_id", userID))
-	child := logger.With(parent, slog.String("request_id", "request-1"))
+	parent := logctx.With(t.Context(), slog.String("user_id", userID))
+	child := logctx.With(parent, slog.String("request_id", "request-1"))
 
 	tests := []struct {
 		name          string
@@ -36,7 +36,7 @@ func TestContextAttributes(t *testing.T) {
 				var output bytes.Buffer
 
 				log := slog.New(
-					logger.ContextHandler(
+					logctx.ContextHandler(
 						slog.NewJSONHandler(&output, nil),
 					),
 				)

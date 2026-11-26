@@ -1,4 +1,4 @@
-package logger
+package logctx
 
 import (
 	"context"
@@ -9,9 +9,16 @@ import (
 type attrsKey struct{}
 
 func With(ctx context.Context, attrs ...slog.Attr) context.Context {
-	all := slices.Concat(attrsFrom(ctx), attrs)
+	return context.WithValue(ctx, attrsKey{}, slices.Concat(attrsFrom(ctx), attrs))
+}
 
-	return context.WithValue(ctx, attrsKey{}, all)
+func attrsFrom(ctx context.Context) []slog.Attr {
+	attrs, ok := ctx.Value(attrsKey{}).([]slog.Attr)
+	if !ok {
+		return nil
+	}
+
+	return attrs
 }
 
 type contextHandler struct {
@@ -43,13 +50,4 @@ func (h contextHandler) WithGroup(name string) slog.Handler {
 	return contextHandler{
 		Handler: h.Handler.WithGroup(name),
 	}
-}
-
-func attrsFrom(ctx context.Context) []slog.Attr {
-	attrs, ok := ctx.Value(attrsKey{}).([]slog.Attr)
-	if !ok {
-		return nil
-	}
-
-	return attrs
 }

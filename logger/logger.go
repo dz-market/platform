@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+
+	"github.com/dz-market/platform/logctx"
 )
 
 type Format string
@@ -41,7 +43,7 @@ func New(opts Options) (*slog.Logger, error) {
 		return nil, fmt.Errorf("unsupported log format %q", opts.Format)
 	}
 
-	log := slog.New(ContextHandler(handler)).With(
+	log := slog.New(logctx.ContextHandler(handler)).With(
 		slog.String("service", opts.Service),
 		slog.String("version", opts.Version),
 	)
